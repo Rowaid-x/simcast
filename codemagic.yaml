@@ -24,6 +24,14 @@ workflows:
           cd flutter_app
           flutter pub get
           flutter create --platforms ios .
+      - name: Set iOS deployment target
+        script: |
+          cd flutter_app/ios
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '15.0'/" Podfile
+          # Also update if no platform line exists (default generated)
+          if ! grep -q "platform :ios" Podfile; then
+            echo "platform :ios, '15.0'" >> Podfile
+          fi
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
