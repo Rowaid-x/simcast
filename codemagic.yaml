@@ -19,9 +19,11 @@ workflows:
         - pattern: FE-simcast
           include: true
     scripts:
-      - name: Install dependencies
+      - name: Install dependencies and generate iOS project
         script: |
-          cd flutter_app && flutter pub get
+          cd flutter_app
+          flutter pub get
+          flutter create --platforms ios .
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
