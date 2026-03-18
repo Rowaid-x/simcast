@@ -27,11 +27,13 @@ workflows:
       - name: Set iOS deployment target
         script: |
           cd flutter_app/ios
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '15.0'/" Podfile
-          # Also update if no platform line exists (default generated)
-          if ! grep -q "platform :ios" Podfile; then
-            echo "platform :ios, '15.0'" >> Podfile
-          fi
+          # Remove any existing platform line
+          sed -i '' '/^platform :ios/d' Podfile
+          # Insert platform at the top of the Podfile
+          sed -i '' '1s/^/platform :ios, '\''15.0'\''\n/' Podfile
+          # Also set it in the Xcode project
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = .*/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' Runner.xcodeproj/project.pbxproj
+          cat Podfile | head -5
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
