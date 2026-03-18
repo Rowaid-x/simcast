@@ -1,0 +1,48 @@
+workflows:
+  ios-workflow:
+    name: iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic2
+    environment:
+      flutter: 3.32.0
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.rowaidx.simcast
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: FE-simcast
+          include: true
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd flutter_app && flutter pub get
+      - name: Install CocoaPods
+        script: |
+          cd flutter_app/ios && pod install
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Build iOS
+        script: |
+          cd flutter_app && flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - flutter_app/build/ios/ipa/*.ipa
+      - flutter_app/build/ios/archive/*.xcarchive
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+      email:
+        recipients:
+          - rowaid.mh@gmail.com
+        notify:
+          success: true
+          failure: true
