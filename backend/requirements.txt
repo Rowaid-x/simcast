@@ -1,0 +1,43 @@
+# Django core
+Django==5.1.4
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+django-filter==24.3
+
+# Authentication
+djangorestframework-simplejwt==5.4.0
+argon2-cffi==23.1.0
+
+# Channels & WebSocket
+channels==4.2.0
+channels-redis==4.2.1
+daphne==4.1.2
+
+# Database
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+
+# Celery
+celery==5.4.0
+django-celery-beat==2.7.0
+redis==5.2.1
+
+# Encryption
+cryptography==44.0.0
+
+# File handling
+Pillow==11.1.0
+python-magic==0.4.27
+
+# Server
+gunicorn==23.0.0
+
+# Rate limiting
+django-ratelimit==4.1.0
+
+# Utils
+python-dotenv==1.0.1
+uuid==1.30
+
+# Firebase
+firebase-admin==6.6.0
