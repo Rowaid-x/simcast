@@ -49,6 +49,12 @@ workflows:
           # Verify
           grep "PRODUCT_BUNDLE_IDENTIFIER" Runner.xcodeproj/project.pbxproj | head -3
           grep "CODE_SIGN_STYLE" Runner.xcodeproj/project.pbxproj | head -3
+      - name: Add privacy descriptions to Info.plist
+        script: |
+          cd flutter_app/ios/Runner
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'This app needs access to your photo library to share images.'" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'This app needs access to the camera to capture photos.'" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'This app needs access to the microphone for voice messages.'" Info.plist || true
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
@@ -58,6 +64,7 @@ workflows:
       - name: Build iOS
         script: |
           cd flutter_app && flutter build ipa --release --verbose \
+            --build-number=$(($(date +%s)/60)) \
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - flutter_app/build/ios/ipa/*.ipa
