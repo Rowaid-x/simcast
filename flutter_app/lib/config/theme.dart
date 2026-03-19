@@ -206,7 +206,7 @@ class WhisperTheme {
         color: WhisperColors.divider,
         thickness: 0.5,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: WhisperColors.surfaceElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(WhisperRadius.xl),
