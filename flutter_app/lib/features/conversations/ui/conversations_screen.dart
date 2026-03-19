@@ -206,7 +206,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
         backgroundColor: WhisperColors.accent,
         elevation: 4,
         child: const Icon(
-          LucideIcons.messagePlus,
+          LucideIcons.messageSquarePlus,
           color: Colors.white,
           size: 24,
         ),
