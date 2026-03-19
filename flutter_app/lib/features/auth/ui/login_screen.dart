@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -61,12 +62,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   String _extractErrorMessage(dynamic error) {
-    if (error.toString().contains('401')) {
-      return 'Invalid email or password.';
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return 'Server is not responding. Please try again later.';
+        case DioExceptionType.connectionError:
+          return 'Could not connect to server. Check your internet connection.';
+        default:
+          break;
+      }
+      if (error.response?.statusCode == 401) {
+        return 'Invalid email or password.';
+      }
+      if (error.response?.statusCode == 429) {
+        return 'Too many attempts. Please try again later.';
+      }
     }
-    if (error.toString().contains('429')) {
-      return 'Too many attempts. Please try again later.';
+    final msg = error.toString();
+    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
+      return 'Could not connect to server. Check your internet connection.';
     }
+    if (msg.contains('401')) return 'Invalid email or password.';
+    if (msg.contains('429')) return 'Too many attempts. Please try again later.';
     return 'Something went wrong. Please try again.';
   }
 

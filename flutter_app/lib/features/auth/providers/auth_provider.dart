@@ -49,7 +49,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
     required String displayName,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    try {
       final repo = ref.read(authRepositoryProvider);
       final user = await repo.register(
         email: email,
@@ -57,8 +57,11 @@ class AuthNotifier extends AsyncNotifier<User?> {
         displayName: displayName,
       );
       ref.read(webSocketClientProvider).connect();
-      return user;
-    });
+      state = AsyncData(user);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
   }
 
   /// Log in with email and password.
@@ -67,12 +70,15 @@ class AuthNotifier extends AsyncNotifier<User?> {
     required String password,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    try {
       final repo = ref.read(authRepositoryProvider);
       final user = await repo.login(email: email, password: password);
       ref.read(webSocketClientProvider).connect();
-      return user;
-    });
+      state = AsyncData(user);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
   }
 
   /// Log out and disconnect WebSocket.
