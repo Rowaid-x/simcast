@@ -299,9 +299,9 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
         for member in offline_members:
             user = member.user
-            if not user.is_online and user.fcm_device_token:
+            if not user.is_online and user.device_token:
                 send_new_message_notification(
-                    recipient_device_token=user.fcm_device_token,
+                    recipient_device_token=user.device_token,
                     sender_name=sender.display_name,
                     conversation_id=str(conversation.id),
                     message_preview=content_preview[:100],
