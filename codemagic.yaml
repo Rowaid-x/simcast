@@ -24,9 +24,14 @@ workflows:
           cd flutter_app
           flutter pub get
           # Stub out record_linux (not needed for iOS, v0.7.2 has compilation errors)
+          # Must keep RecordLinux class with registerWith() since dart_plugin_registrant.dart references it
           RECORD_LINUX=$(find $HOME/.pub-cache/hosted/pub.dev -maxdepth 1 -name "record_linux-*" -type d | head -1)
           if [ -n "$RECORD_LINUX" ]; then
-            echo "library record_linux;" > "$RECORD_LINUX/lib/record_linux.dart"
+            cat > "$RECORD_LINUX/lib/record_linux.dart" << 'STUB'
+          class RecordLinux {
+            static void registerWith() {}
+          }
+          STUB
             echo "Stubbed record_linux at $RECORD_LINUX"
           fi
           flutter create --platforms ios .
