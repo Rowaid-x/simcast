@@ -32,4 +32,6 @@ class AppConstants {
   static const String accessTokenKey = 'whisper_access_token';
   static const String refreshTokenKey = 'whisper_refresh_token';
   static const String userIdKey = 'whisper_user_id';
+  static const String savedEmailKey = 'whisper_saved_email';
+  static const String savedPasswordKey = 'whisper_saved_password';
 }

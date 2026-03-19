@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -90,10 +91,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
         hasMore: page.hasMore,
         nextCursor: page.nextCursor,
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[ChatNotifier] Failed to load messages: $e');
+      debugPrint('[ChatNotifier] Stack trace: $st');
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to load messages',
+        error: 'Failed to load messages: $e',
       );
     }
   }

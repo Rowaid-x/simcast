@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../config/theme.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../providers/auth_provider.dart';
 
 /// Login screen with email and password authentication.
@@ -24,6 +25,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final email = await SecureStorage.getSavedEmail();
+    final password = await SecureStorage.getSavedPassword();
+    if (mounted && email != null && email.isNotEmpty) {
+      _emailController.text = email;
+      if (password != null && password.isNotEmpty) {
+        _passwordController.text = password;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -36,10 +54,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
       await ref.read(authStateProvider.notifier).login(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: email,
+            password: password,
           );
+
+      // Save credentials on successful login
+      await SecureStorage.saveCredentials(email: email, password: password);
 
       if (mounted) {
         context.go('/conversations');

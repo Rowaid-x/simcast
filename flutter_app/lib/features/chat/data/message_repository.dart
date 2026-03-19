@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../models/message.dart';
 import 'message_api.dart';
 
@@ -12,9 +14,21 @@ class MessageRepository {
     String conversationId, {
     String? cursor,
   }) async {
+    debugPrint('[MessageRepo] getMessages for conversation: $conversationId');
     final data = await _api.getMessages(conversationId, cursor: cursor);
+    debugPrint('[MessageRepo] raw response keys: ${data.keys.toList()}');
     final results = (data['results'] as List?) ?? [];
-    final messages = results.map((json) => Message.fromJson(json)).toList();
+    debugPrint('[MessageRepo] results count: ${results.length}');
+    final messages = <Message>[];
+    for (final json in results) {
+      try {
+        messages.add(Message.fromJson(json as Map<String, dynamic>));
+      } catch (e) {
+        debugPrint('[MessageRepo] Failed to parse message: $e');
+        debugPrint('[MessageRepo] Raw JSON: $json');
+      }
+    }
+    debugPrint('[MessageRepo] parsed messages count: ${messages.length}');
     return MessagePage(
       messages: messages,
       nextCursor: data['next'] as String?,
