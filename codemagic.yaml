@@ -55,6 +55,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'This app needs access to your photo library to share images.'" Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'This app needs access to the camera to capture photos.'" Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'This app needs access to the microphone for voice messages.'" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" Info.plist || true
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
