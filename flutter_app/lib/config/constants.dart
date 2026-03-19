@@ -3,8 +3,8 @@ class AppConstants {
   AppConstants._();
 
   // API Configuration
-  static const String baseUrl = 'http://localhost:8000/api/v1';
-  static const String wsUrl = 'ws://localhost:8001/ws/chat/';
+  static const String baseUrl = 'http://76.13.213.26/api/v1';
+  static const String wsUrl = 'ws://76.13.213.26/ws/chat/';
 
   // Timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

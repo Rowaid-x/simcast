@@ -59,6 +59,9 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'This app needs access to the camera to capture photos.'" Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'This app needs access to the microphone for voice messages.'" Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" Info.plist || true
+          # Allow HTTP connections (ATS exception) — needed until HTTPS/domain is configured
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" Info.plist || true
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
