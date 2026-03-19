@@ -24,16 +24,17 @@ workflows:
           cd flutter_app
           flutter pub get
           flutter create --platforms ios .
-      - name: Set iOS deployment target
+      - name: Set bundle ID and iOS deployment target
         script: |
           cd flutter_app/ios
-          # Remove any existing platform line
+          # Fix bundle ID (flutter create resets it to com.example.*)
+          sed -i '' 's/PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = com.rowaidx.simcast;/g' Runner.xcodeproj/project.pbxproj
+          # Set deployment target
           sed -i '' '/^platform :ios/d' Podfile
-          # Insert platform at the top of the Podfile
           sed -i '' '1s/^/platform :ios, '\''15.0'\''\n/' Podfile
-          # Also set it in the Xcode project
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = .*/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' Runner.xcodeproj/project.pbxproj
-          cat Podfile | head -5
+          # Verify
+          grep "PRODUCT_BUNDLE_IDENTIFIER" Runner.xcodeproj/project.pbxproj | head -3
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
