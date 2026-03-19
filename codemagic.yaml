@@ -35,6 +35,9 @@ workflows:
             echo "Stubbed record_linux at $RECORD_LINUX"
           fi
           flutter create --platforms ios .
+          # Copy GoogleService-Info.plist into iOS Runner bundle (required by firebase_messaging)
+          cp firebase/GoogleService-Info.plist ios/Runner/GoogleService-Info.plist
+          echo "Copied GoogleService-Info.plist to ios/Runner/"
       - name: Set bundle ID and iOS deployment target
         script: |
           cd flutter_app/ios
