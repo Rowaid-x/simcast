@@ -27,6 +27,8 @@ class ChatState {
   final String? nextCursor;
   final String? error;
   final Map<String, bool> typingUsers;
+  final int? autoDeleteTimer;
+  final bool timerUpdated;
 
   const ChatState({
     this.messages = const [],
@@ -35,6 +37,8 @@ class ChatState {
     this.nextCursor,
     this.error,
     this.typingUsers = const {},
+    this.autoDeleteTimer,
+    this.timerUpdated = false,
   });
 
   ChatState copyWith({
@@ -44,6 +48,9 @@ class ChatState {
     String? nextCursor,
     String? error,
     Map<String, bool>? typingUsers,
+    int? autoDeleteTimer,
+    bool? timerUpdated,
+    bool clearTimer = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -52,6 +59,8 @@ class ChatState {
       nextCursor: nextCursor ?? this.nextCursor,
       error: error,
       typingUsers: typingUsers ?? this.typingUsers,
+      autoDeleteTimer: clearTimer ? null : (autoDeleteTimer ?? this.autoDeleteTimer),
+      timerUpdated: timerUpdated ?? this.timerUpdated,
     );
   }
 }
@@ -306,6 +315,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         case 'chat.deleted':
           _handleDeletion(message);
           break;
+        case 'chat.timer_update':
+          _handleTimerUpdate(message);
+          break;
       }
     });
   }
@@ -374,6 +386,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return m;
     }).toList();
     state = state.copyWith(messages: updated);
+  }
+
+  void _handleTimerUpdate(Map<String, dynamic> data) {
+    final convId = data['conversation_id'] as String?;
+    if (convId != conversationId) return;
+
+    final newTimer = data['auto_delete_timer'] as int?;
+    state = state.copyWith(
+      autoDeleteTimer: newTimer,
+      timerUpdated: true,
+      clearTimer: newTimer == null,
+    );
   }
 
   void _handleDeletion(Map<String, dynamic> data) {

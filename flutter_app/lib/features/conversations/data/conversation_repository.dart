@@ -60,6 +60,16 @@ class ConversationRepository {
     await _api.deleteConversation(id);
   }
 
+  /// Remove a member from a group conversation.
+  Future<void> removeMember(String conversationId, String userId) async {
+    await _api.removeMember(conversationId, userId);
+  }
+
+  /// Add members to a group conversation.
+  Future<void> addMembers(String conversationId, List<String> userIds) async {
+    await _api.addMembers(conversationId, userIds);
+  }
+
   /// Search for users.
   Future<List<User>> searchUsers(String query) async {
     final results = await _api.searchUsers(query);

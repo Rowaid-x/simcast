@@ -9,6 +9,7 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../widgets/avatar.dart';
 import '../providers/chat_provider.dart';
 import 'chat_settings_sheet.dart';
+import 'group_info_sheet.dart';
 import 'widgets/auto_delete_badge.dart';
 import 'widgets/chat_input_bar.dart';
 import 'widgets/message_bubble.dart';
@@ -85,6 +86,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  void _showGroupInfo() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => GroupInfoSheet(
+        conversationId: widget.conversationId,
+        conversationName: widget.conversationName,
+      ),
+    );
+  }
+
   void _showMenu() {
     showModalBottomSheet(
       context: context,
@@ -146,6 +159,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     style: WhisperTypography.bodyLarge),
                 onTap: () {
                   Navigator.pop(context);
+                  _showGroupInfo();
                 },
               ),
             const SizedBox(height: WhisperSpacing.lg),
@@ -158,6 +172,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider(widget.conversationId));
+
+    // React to real-time timer updates from WebSocket
+    if (chatState.timerUpdated &&
+        chatState.autoDeleteTimer != _currentAutoDeleteTimer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _currentAutoDeleteTimer = chatState.autoDeleteTimer);
+        }
+      });
+    }
 
     return Scaffold(
       body: SafeArea(

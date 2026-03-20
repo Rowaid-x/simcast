@@ -1,7 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../config/theme.dart';
@@ -22,6 +24,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _bioController = TextEditingController();
   bool _isEditing = false;
   bool _isSaving = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
@@ -38,6 +41,61 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _nameController.dispose();
     _bioController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploadingAvatar = true);
+
+    try {
+      final dio = ref.read(apiClientProvider);
+
+      // Upload the file
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(image.path),
+      });
+      final uploadResponse = await dio.post('/upload/', data: formData);
+      final fileUrl = uploadResponse.data['file_url'] as String;
+
+      // Patch avatar_url on user profile
+      await dio.patch('/users/me/', data: {'avatar_url': fileUrl});
+
+      // Update local auth state
+      final updatedUser = ref.read(authStateProvider).valueOrNull?.copyWith(
+            avatarUrl: fileUrl,
+          );
+      if (updatedUser != null) {
+        ref.read(authStateProvider.notifier).updateUser(updatedUser);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated'),
+            backgroundColor: WhisperColors.surfaceElevated,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload picture: $e'),
+            backgroundColor: WhisperColors.surfaceElevated,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -252,21 +310,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Positioned(
                         right: 0,
                         bottom: 0,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: WhisperColors.accent,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: WhisperColors.background,
-                              width: 2,
+                        child: GestureDetector(
+                          onTap: _isUploadingAvatar ? null : _pickAndUploadAvatar,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: WhisperColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: WhisperColors.background,
+                                width: 2,
+                              ),
                             ),
-                          ),
-                          child: const Icon(
-                            LucideIcons.camera,
-                            color: Colors.white,
-                            size: 14,
+                            child: _isUploadingAvatar
+                                ? const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    LucideIcons.camera,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
                           ),
                         ),
                       ),
