@@ -201,6 +201,7 @@ MESSAGE_ENCRYPTION_KEY = os.environ.get('MESSAGE_ENCRYPTION_KEY', '')
 
 # FCM
 FCM_SERVER_KEY = os.environ.get('FCM_SERVER_KEY', '')
+FIREBASE_CREDENTIALS_PATH = os.environ.get('FIREBASE_CREDENTIALS_PATH', '')
 
 # Security settings for production
 if not DEBUG:
