@@ -1,14 +1,17 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/websocket_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../models/message.dart';
+import '../../../models/user.dart';
 import '../data/message_api.dart';
 import '../data/message_repository.dart';
+
+const _uuid = Uuid();
 
 /// Provider for the MessageRepository.
 final messageRepositoryProvider = Provider<MessageRepository>((ref) {
@@ -91,12 +94,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         hasMore: page.hasMore,
         nextCursor: page.nextCursor,
       );
-    } catch (e, st) {
-      debugPrint('[ChatNotifier] Failed to load messages: $e');
-      debugPrint('[ChatNotifier] Stack trace: $st');
+    } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to load messages: $e',
+        error: 'Failed to load messages',
       );
     }
   }
@@ -133,6 +134,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
     int? fileSize,
     String? fileMimeType,
   }) async {
+    // Build optimistic message so it appears immediately
+    final tempId = 'temp_${_uuid.v4()}';
+    final userId = await SecureStorage.getUserId();
+    final optimistic = Message(
+      id: tempId,
+      conversationId: conversationId,
+      sender: userId != null ? User(id: userId, email: '', displayName: 'You') : null,
+      content: content,
+      messageType: messageType,
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileSize: fileSize,
+      fileMimeType: fileMimeType,
+      replyTo: replyTo,
+      createdAt: DateTime.now(),
+    );
+    _addMessage(optimistic);
+
     final wsClient = _ref.read(webSocketClientProvider);
 
     if (wsClient.state == WsConnectionState.connected) {
@@ -160,8 +179,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
           fileSize: fileSize,
           fileMimeType: fileMimeType,
         );
-        _addMessage(message);
+        // Replace optimistic message with the real one
+        _replaceOptimistic(tempId, message);
       } catch (e) {
+        // Remove the optimistic message on failure
+        _removeMessage(tempId);
         state = state.copyWith(error: 'Failed to send message');
       }
     }
@@ -281,16 +303,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final msg = Message.fromJson(messageData);
     if (msg.conversationId != conversationId) return;
 
-    // Avoid duplicates
+    // Avoid duplicates (by real server ID)
     if (state.messages.any((m) => m.id == msg.id)) return;
 
-    _addMessage(msg);
+    // Replace the oldest temp message from this sender (optimistic), or just add
+    final tempIndex = state.messages.indexWhere((m) => m.id.startsWith('temp_'));
+    if (tempIndex != -1) {
+      final updated = List<Message>.from(state.messages);
+      updated[tempIndex] = msg;
+      state = state.copyWith(messages: updated);
+    } else {
+      _addMessage(msg);
+    }
   }
 
   void _addMessage(Message message) {
     state = state.copyWith(
       messages: [message, ...state.messages],
     );
+  }
+
+  void _replaceOptimistic(String tempId, Message real) {
+    final updated = state.messages.map((m) => m.id == tempId ? real : m).toList();
+    state = state.copyWith(messages: updated);
+  }
+
+  void _removeMessage(String messageId) {
+    final updated = state.messages.where((m) => m.id != messageId).toList();
+    state = state.copyWith(messages: updated);
   }
 
   void _handleTyping(Map<String, dynamic> data) {

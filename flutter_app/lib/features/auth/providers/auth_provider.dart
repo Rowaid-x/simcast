@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/websocket_client.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../models/user.dart';
 import '../data/auth_api.dart';
@@ -34,6 +35,9 @@ class AuthNotifier extends AsyncNotifier<User?> {
       // Connect WebSocket on successful auth
       ref.read(webSocketClientProvider).connect();
 
+      // Initialize push notifications
+      _initPushNotifications();
+
       return user;
     } catch (_) {
       // Tokens invalid — clear and return null
@@ -57,6 +61,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
         displayName: displayName,
       );
       ref.read(webSocketClientProvider).connect();
+      _initPushNotifications();
       state = AsyncData(user);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -74,6 +79,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
       final repo = ref.read(authRepositoryProvider);
       final user = await repo.login(email: email, password: password);
       ref.read(webSocketClientProvider).connect();
+      _initPushNotifications();
       state = AsyncData(user);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -92,5 +98,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
   /// Update the user profile locally (after API update).
   void updateUser(User user) {
     state = AsyncData(user);
+  }
+
+  void _initPushNotifications() {
+    try {
+      ref.read(pushNotificationServiceProvider).initialize(ref);
+    } catch (_) {
+      // Push notifications are non-critical — don't block auth
+    }
   }
 }

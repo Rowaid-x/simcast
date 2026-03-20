@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/constants.dart';
@@ -19,11 +18,6 @@ final apiClientProvider = Provider<Dio>((ref) {
     ),
   );
 
-  dio.interceptors.add(LogInterceptor(
-    requestBody: false,
-    responseBody: true,
-    logPrint: (o) => debugPrint('[Dio] $o'),
-  ));
   dio.interceptors.add(JwtInterceptor(dio));
   return dio;
 });

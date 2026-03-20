@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../firebase_options.dart';
@@ -25,7 +24,7 @@ class PushNotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   /// Initialize push notifications — request permissions, get token, register handlers.
-  Future<void> initialize(WidgetRef ref) async {
+  Future<void> initialize(Ref ref) async {
     // Set background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -65,7 +64,7 @@ class PushNotificationService {
   }
 
   /// Register the device FCM token with the backend.
-  Future<void> _registerDeviceToken(WidgetRef ref, String token) async {
+  Future<void> _registerDeviceToken(Ref ref, String token) async {
     try {
       final dio = ref.read(apiClientProvider);
       await dio.post('/users/me/device-token/', data: {

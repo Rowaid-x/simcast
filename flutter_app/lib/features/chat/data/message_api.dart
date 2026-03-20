@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 /// API service for message endpoints.
 class MessageApi {
@@ -20,8 +19,6 @@ class MessageApi {
       '/conversations/$conversationId/messages/',
       queryParameters: params,
     );
-    debugPrint('[MessageApi] getMessages response status: ${response.statusCode}');
-    debugPrint('[MessageApi] getMessages results count: ${(response.data as Map<String, dynamic>)["results"]?.length}');
     return response.data as Map<String, dynamic>;
   }
 
