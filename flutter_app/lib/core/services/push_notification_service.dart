@@ -29,23 +29,33 @@ class PushNotificationService {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Request permission (iOS/macOS)
+    debugPrint('[Push] Requesting notification permissions...');
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
     );
+    debugPrint('[Push] Authorization status: ${settings.authorizationStatus}');
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
       // Get FCM token
-      final token = await _messaging.getToken();
-      if (token != null) {
-        await _registerDeviceToken(ref, token);
+      try {
+        final token = await _messaging.getToken();
+        debugPrint('[Push] FCM token: ${token != null ? '${token.substring(0, 20)}...' : 'NULL'}');
+        if (token != null) {
+          await _registerDeviceToken(ref, token);
+        } else {
+          debugPrint('[Push] ERROR: FCM token is null — APNs may not be configured');
+        }
+      } catch (e) {
+        debugPrint('[Push] ERROR getting FCM token: $e');
       }
 
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((newToken) {
+        debugPrint('[Push] Token refreshed, re-registering...');
         _registerDeviceToken(ref, newToken);
       });
 
@@ -60,6 +70,8 @@ class PushNotificationService {
       if (initialMessage != null) {
         _handleNotificationTap(initialMessage);
       }
+    } else {
+      debugPrint('[Push] Notifications NOT authorized — status: ${settings.authorizationStatus}');
     }
   }
 
@@ -67,12 +79,13 @@ class PushNotificationService {
   Future<void> _registerDeviceToken(Ref ref, String token) async {
     try {
       final dio = ref.read(apiClientProvider);
-      await dio.post('/users/me/device-token/', data: {
+      final response = await dio.post('/users/me/device-token/', data: {
         'device_token': token,
         'platform': Platform.isIOS ? 'ios' : 'android',
       });
-    } catch (_) {
-      // Silently fail — token will be retried on refresh
+      debugPrint('[Push] Device token registered successfully: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('[Push] ERROR registering device token: $e');
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -103,8 +104,8 @@ class AuthNotifier extends AsyncNotifier<User?> {
   void _initPushNotifications() {
     try {
       ref.read(pushNotificationServiceProvider).initialize(ref);
-    } catch (_) {
-      // Push notifications are non-critical — don't block auth
+    } catch (e) {
+      debugPrint('[Push] _initPushNotifications error: $e');
     }
   }
 }

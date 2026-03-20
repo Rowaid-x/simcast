@@ -52,6 +52,28 @@ workflows:
           # Verify
           grep "PRODUCT_BUNDLE_IDENTIFIER" Runner.xcodeproj/project.pbxproj | head -3
           grep "CODE_SIGN_STYLE" Runner.xcodeproj/project.pbxproj | head -3
+      - name: Add push notification entitlement
+        script: |
+          cd flutter_app/ios/Runner
+          cat > Runner.entitlements << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>aps-environment</key>
+            <string>production</string>
+          </dict>
+          </plist>
+          EOF
+          # Strip leading whitespace from the heredoc
+          sed -i '' 's/^          //' Runner.entitlements
+          # Add entitlements to Xcode project build settings
+          cd ../
+          sed -i '' 's/CODE_SIGN_ENTITLEMENTS = "";/CODE_SIGN_ENTITLEMENTS = Runner\/Runner.entitlements;/g' Runner.xcodeproj/project.pbxproj
+          # If no existing entitlements setting, add it after CODE_SIGN_STYLE
+          grep -q 'CODE_SIGN_ENTITLEMENTS' Runner.xcodeproj/project.pbxproj || \
+            sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner\/Runner.entitlements;/g' Runner.xcodeproj/project.pbxproj
+          echo "Push notification entitlement added"
       - name: Add privacy descriptions to Info.plist
         script: |
           cd flutter_app/ios/Runner
@@ -62,6 +84,10 @@ workflows:
           # Allow HTTP connections (ATS exception) — needed until HTTPS/domain is configured
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" Info.plist || true
+          # Enable background modes for remote notifications
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string fetch" Info.plist || true
       - name: Install CocoaPods
         script: |
           cd flutter_app/ios && pod install
