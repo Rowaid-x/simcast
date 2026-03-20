@@ -54,26 +54,43 @@ workflows:
           grep "CODE_SIGN_STYLE" Runner.xcodeproj/project.pbxproj | head -3
       - name: Add push notification entitlement
         script: |
-          cd flutter_app/ios/Runner
-          cat > Runner.entitlements << 'EOF'
+          cd flutter_app/ios
+
+          # 1. Create the entitlements file
+          cat > Runner/Runner.entitlements << 'ENTITLEMENTS'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-            <key>aps-environment</key>
-            <string>production</string>
+          	<key>aps-environment</key>
+          	<string>production</string>
           </dict>
           </plist>
-          EOF
-          # Strip leading whitespace from the heredoc
-          sed -i '' 's/^          //' Runner.entitlements
-          # Add entitlements to Xcode project build settings
-          cd ../
-          sed -i '' 's/CODE_SIGN_ENTITLEMENTS = "";/CODE_SIGN_ENTITLEMENTS = Runner\/Runner.entitlements;/g' Runner.xcodeproj/project.pbxproj
-          # If no existing entitlements setting, add it after CODE_SIGN_STYLE
-          grep -q 'CODE_SIGN_ENTITLEMENTS' Runner.xcodeproj/project.pbxproj || \
-            sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner\/Runner.entitlements;/g' Runner.xcodeproj/project.pbxproj
-          echo "Push notification entitlement added"
+          ENTITLEMENTS
+          # Strip leading whitespace
+          sed -i '' 's/^          //' Runner/Runner.entitlements
+          echo "--- Runner.entitlements ---"
+          cat Runner/Runner.entitlements
+
+          # 2. Use Ruby + xcodeproj gem to inject entitlements into every build configuration
+          gem install xcodeproj --no-document
+          ruby <<'RUBY'
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('Runner.xcodeproj')
+          project.targets.each do |target|
+            next unless target.name == 'Runner'
+            target.build_configurations.each do |config|
+              config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'Runner/Runner.entitlements'
+              puts "Set CODE_SIGN_ENTITLEMENTS for #{config.name}"
+            end
+          end
+          project.save
+          RUBY
+          echo "Push notification entitlement injected into Xcode project"
+
+          # 3. Verify
+          grep -c 'CODE_SIGN_ENTITLEMENTS' Runner.xcodeproj/project.pbxproj
+          echo "Entitlement references found in project.pbxproj"
       - name: Add privacy descriptions to Info.plist
         script: |
           cd flutter_app/ios/Runner
