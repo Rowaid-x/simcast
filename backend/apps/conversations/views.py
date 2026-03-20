@@ -1,6 +1,8 @@
 """Views for conversation management."""
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.db.models import Q, Max
 from django.utils import timezone
@@ -155,6 +157,20 @@ class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
         new_timer = instance.auto_delete_timer
         if old_timer != new_timer:
             self._recalculate_expires(instance, new_timer)
+            self._broadcast_timer_update(instance, new_timer)
+
+    def _broadcast_timer_update(self, conversation, new_timer):
+        """Broadcast auto_delete_timer change to all members via WebSocket."""
+        channel_layer = get_channel_layer()
+        group_name = f'conversation_{conversation.id}'
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'chat.timer_update',
+                'conversation_id': str(conversation.id),
+                'auto_delete_timer': new_timer,
+            },
+        )
 
     def _recalculate_expires(self, conversation, new_timer):
         """Recalculate expires_at for all non-deleted messages when timer changes."""

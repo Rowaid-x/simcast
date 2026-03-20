@@ -196,6 +196,14 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             'message_ids': event['message_ids'],
         })
 
+    async def chat_timer_update(self, event):
+        """Send timer update to the client."""
+        await self.send_json({
+            'type': 'chat.timer_update',
+            'conversation_id': event['conversation_id'],
+            'auto_delete_timer': event['auto_delete_timer'],
+        })
+
     async def user_online(self, event):
         """Send online status change to the client."""
         if event['user_id'] == str(self.user.id):
