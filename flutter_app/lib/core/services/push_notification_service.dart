@@ -47,6 +47,18 @@ class PushNotificationService {
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
+      // On iOS, wait for APNs token before requesting FCM token
+      if (Platform.isIOS) {
+        _log(ref, 'iOS: waiting for APNs token...');
+        String? apnsToken;
+        for (int i = 0; i < 10; i++) {
+          apnsToken = await _messaging.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future.delayed(const Duration(seconds: 1));
+        }
+        _log(ref, apnsToken != null ? 'APNs token OK' : 'APNs token still null after 10s');
+      }
+
       // Get FCM token
       try {
         _log(ref, 'Getting FCM token...');
@@ -55,7 +67,7 @@ class PushNotificationService {
           _log(ref, 'Token: ${token.substring(0, 20)}...');
           await _registerDeviceToken(ref, token);
         } else {
-          _log(ref, 'ERROR: Token is NULL (APNs not configured?)');
+          _log(ref, 'ERROR: Token is NULL');
         }
       } catch (e) {
         _log(ref, 'ERROR getting token: $e');
