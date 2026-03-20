@@ -57,8 +57,9 @@ class ChatState {
 }
 
 /// Provider family for per-conversation chat state.
+/// Uses autoDispose so state is fresh each time the chat screen is opened.
 final chatProvider =
-    StateNotifierProvider.family<ChatNotifier, ChatState, String>(
+    StateNotifierProvider.autoDispose.family<ChatNotifier, ChatState, String>(
   (ref, conversationId) => ChatNotifier(ref, conversationId),
 );
 
@@ -70,9 +71,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Timer? _typingTimer;
   bool _isTypingSent = false;
 
-  ChatNotifier(this._ref, this.conversationId) : super(const ChatState()) {
-    _loadInitialMessages();
+  ChatNotifier(this._ref, this.conversationId)
+      : super(const ChatState(isLoading: true)) {
     _subscribeToWebSocket();
+    Future.microtask(() => _loadInitialMessages());
   }
 
   @override
@@ -82,12 +84,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
     super.dispose();
   }
 
+  /// Refresh messages (for pull-to-refresh).
+  Future<void> refresh() async {
+    await _loadInitialMessages();
+  }
+
   /// Load the first page of messages.
   Future<void> _loadInitialMessages() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final repo = _ref.read(messageRepositoryProvider);
       final page = await repo.getMessages(conversationId);
+      if (!mounted) return;
       state = state.copyWith(
         messages: page.messages,
         isLoading: false,
@@ -95,6 +104,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         nextCursor: page.nextCursor,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to load messages',
@@ -104,7 +114,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   /// Load more (older) messages for infinite scroll.
   Future<void> loadMore() async {
-    if (state.isLoading || !state.hasMore) return;
+    if (!mounted || state.isLoading || !state.hasMore) return;
 
     state = state.copyWith(isLoading: true);
     try {
@@ -113,6 +123,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         conversationId,
         cursor: state.nextCursor,
       );
+      if (!mounted) return;
       state = state.copyWith(
         messages: [...state.messages, ...page.messages],
         isLoading: false,
@@ -120,6 +131,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         nextCursor: page.nextCursor,
       );
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false);
     }
   }

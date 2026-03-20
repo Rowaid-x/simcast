@@ -180,7 +180,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     )
                   : chatState.error != null && chatState.messages.isEmpty
                       ? _buildErrorState(chatState.error!)
-                      : _buildMessagesList(chatState),
+                      : RefreshIndicator(
+                          onRefresh: () => ref
+                              .read(chatProvider(widget.conversationId)
+                                  .notifier)
+                              .refresh(),
+                          color: WhisperColors.accent,
+                          backgroundColor: WhisperColors.surfacePrimary,
+                          child: _buildMessagesList(chatState),
+                        ),
             ),
 
             // Typing indicator
