@@ -36,7 +36,7 @@ class AuthNotifier extends AsyncNotifier<User?> {
       // Connect WebSocket on successful auth
       ref.read(webSocketClientProvider).connect();
 
-      // Initialize push notifications
+      // Initialize push notifications (don't block auth)
       _initPushNotifications();
 
       return user;
@@ -102,10 +102,13 @@ class AuthNotifier extends AsyncNotifier<User?> {
   }
 
   void _initPushNotifications() {
-    try {
-      ref.read(pushNotificationServiceProvider).initialize(ref);
-    } catch (e) {
+    debugPrint('[Push] _initPushNotifications called');
+    ref
+        .read(pushNotificationServiceProvider)
+        .initialize(ref)
+        .then((_) => debugPrint('[Push] initialization completed'))
+        .catchError((e) {
       debugPrint('[Push] _initPushNotifications error: $e');
-    }
+    });
   }
 }

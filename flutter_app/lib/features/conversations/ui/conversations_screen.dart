@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../config/theme.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../widgets/avatar.dart';
 import '../../../widgets/shimmer_loading.dart';
@@ -46,11 +47,33 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final conversationsAsync = ref.watch(conversationsProvider);
     final authState = ref.watch(authStateProvider);
     final currentUser = authState.valueOrNull;
+    final pushLogs = ref.watch(pushDebugLogProvider);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
+            // TODO: Remove this debug banner after push notifications are working
+            if (pushLogs.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                color: Colors.orange.withOpacity(0.2),
+                child: Text(
+                  'Push: ${pushLogs.join(' → ')}',
+                  style: const TextStyle(fontSize: 11, color: Colors.orange),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                color: Colors.red.withOpacity(0.2),
+                child: const Text(
+                  'Push: No logs yet (init not called?)',
+                  style: TextStyle(fontSize: 11, color: Colors.red),
+                ),
+              ),
             // Custom header
             Padding(
               padding: const EdgeInsets.fromLTRB(

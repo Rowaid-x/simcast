@@ -24,38 +24,46 @@ class PushNotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   /// Initialize push notifications — request permissions, get token, register handlers.
+  void _log(Ref ref, String msg) {
+    debugPrint('[Push] $msg');
+    ref.read(pushDebugLogProvider.notifier).update((s) => [...s, msg]);
+  }
+
   Future<void> initialize(Ref ref) async {
+    _log(ref, 'Starting push init...');
+
     // Set background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Request permission (iOS/macOS)
-    debugPrint('[Push] Requesting notification permissions...');
+    _log(ref, 'Requesting permissions...');
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
     );
-    debugPrint('[Push] Authorization status: ${settings.authorizationStatus}');
+    _log(ref, 'Auth status: ${settings.authorizationStatus}');
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized ||
         settings.authorizationStatus == AuthorizationStatus.provisional) {
       // Get FCM token
       try {
+        _log(ref, 'Getting FCM token...');
         final token = await _messaging.getToken();
-        debugPrint('[Push] FCM token: ${token != null ? '${token.substring(0, 20)}...' : 'NULL'}');
         if (token != null) {
+          _log(ref, 'Token: ${token.substring(0, 20)}...');
           await _registerDeviceToken(ref, token);
         } else {
-          debugPrint('[Push] ERROR: FCM token is null — APNs may not be configured');
+          _log(ref, 'ERROR: Token is NULL (APNs not configured?)');
         }
       } catch (e) {
-        debugPrint('[Push] ERROR getting FCM token: $e');
+        _log(ref, 'ERROR getting token: $e');
       }
 
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((newToken) {
-        debugPrint('[Push] Token refreshed, re-registering...');
+        _log(ref, 'Token refreshed, re-registering...');
         _registerDeviceToken(ref, newToken);
       });
 
@@ -71,7 +79,7 @@ class PushNotificationService {
         _handleNotificationTap(initialMessage);
       }
     } else {
-      debugPrint('[Push] Notifications NOT authorized — status: ${settings.authorizationStatus}');
+      _log(ref, 'NOT authorized: ${settings.authorizationStatus}');
     }
   }
 
@@ -83,9 +91,9 @@ class PushNotificationService {
         'device_token': token,
         'platform': Platform.isIOS ? 'ios' : 'android',
       });
-      debugPrint('[Push] Device token registered successfully: ${response.statusCode}');
+      _log(ref, 'Token registered! (${response.statusCode})');
     } catch (e) {
-      debugPrint('[Push] ERROR registering device token: $e');
+      _log(ref, 'ERROR registering token: $e');
     }
   }
 
@@ -114,6 +122,9 @@ class PushNotificationService {
     return id;
   }
 }
+
+/// Debug log for push notification status (visible in UI temporarily).
+final pushDebugLogProvider = StateProvider<List<String>>((ref) => []);
 
 /// Global push notification service provider.
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
