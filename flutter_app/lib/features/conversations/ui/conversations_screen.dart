@@ -28,9 +28,77 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    // Check for pending notification tap and navigate to the chat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pushService = ref.read(pushNotificationServiceProvider);
+      final pendingConvId = pushService.consumePendingConversationId();
+      if (pendingConvId != null && mounted) {
+        context.push('/chat/$pendingConvId', extra: {
+          'name': 'Chat',
+          'type': 'direct',
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _confirmDeleteConversation(conversation) {
+    final isGroup = conversation.type == 'group';
+    final title = isGroup ? 'Leave group?' : 'Delete conversation?';
+    final body = isGroup
+        ? 'You will no longer receive messages from "${conversation.displayName}".'
+        : 'This conversation with ${conversation.displayName} will be removed.';
+    final action = isGroup ? 'Leave' : 'Delete';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: WhisperColors.surfaceElevated,
+        title: Text(title, style: WhisperTypography.heading3),
+        content: Text(
+          body,
+          style: WhisperTypography.bodyMedium.copyWith(
+            color: WhisperColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final repo = ref.read(conversationRepositoryProvider);
+                await repo.deleteConversation(conversation.id);
+                ref.read(conversationsProvider.notifier).refresh();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to $action conversation'),
+                      backgroundColor: WhisperColors.surfaceElevated,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text(
+              action,
+              style: TextStyle(color: WhisperColors.destructive),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openNewConversationSheet() {
@@ -47,33 +115,11 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final conversationsAsync = ref.watch(conversationsProvider);
     final authState = ref.watch(authStateProvider);
     final currentUser = authState.valueOrNull;
-    final pushLogs = ref.watch(pushDebugLogProvider);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // TODO: Remove this debug banner after push notifications are working
-            if (pushLogs.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                color: Colors.orange.withOpacity(0.2),
-                child: Text(
-                  'Push: ${pushLogs.join(' → ')}',
-                  style: const TextStyle(fontSize: 11, color: Colors.orange),
-                ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                color: Colors.red.withOpacity(0.2),
-                child: const Text(
-                  'Push: No logs yet (init not called?)',
-                  style: TextStyle(fontSize: 11, color: Colors.red),
-                ),
-              ),
             // Custom header
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -209,6 +255,8 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                               },
                             );
                           },
+                          onDelete: () =>
+                              _confirmDeleteConversation(conversation),
                         ).animate().fadeIn(
                               duration: 200.ms,
                               delay: Duration(milliseconds: index * 30),

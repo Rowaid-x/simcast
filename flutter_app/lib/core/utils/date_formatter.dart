@@ -6,51 +6,54 @@ class DateFormatter {
 
   /// Format a timestamp for conversation list (e.g., "2:30 PM", "Yesterday", "Mon", "12/25").
   static String conversationTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    final messageDate = DateTime(local.year, local.month, local.day);
     final diff = today.difference(messageDate).inDays;
 
     if (diff == 0) {
-      return DateFormat('h:mm a').format(dateTime);
+      return DateFormat('h:mm a').format(local);
     } else if (diff == 1) {
       return 'Yesterday';
     } else if (diff < 7) {
-      return DateFormat('EEE').format(dateTime);
+      return DateFormat('EEE').format(local);
     } else {
-      return DateFormat('M/d/yy').format(dateTime);
+      return DateFormat('M/d/yy').format(local);
     }
   }
 
   /// Format a timestamp for message bubbles (e.g., "2:30 PM").
   static String messageTime(DateTime dateTime) {
-    return DateFormat('h:mm a').format(dateTime);
+    return DateFormat('h:mm a').format(dateTime.toLocal());
   }
 
   /// Format a date separator in the chat (e.g., "Today", "Yesterday", "March 15, 2026").
   static String dateSeparator(DateTime dateTime) {
+    final local = dateTime.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    final messageDate = DateTime(local.year, local.month, local.day);
     final diff = today.difference(messageDate).inDays;
 
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Yesterday';
-    if (dateTime.year == now.year) {
-      return DateFormat('MMMM d').format(dateTime);
+    if (local.year == now.year) {
+      return DateFormat('MMMM d').format(local);
     }
-    return DateFormat('MMMM d, y').format(dateTime);
+    return DateFormat('MMMM d, y').format(local);
   }
 
   /// Format last seen time (e.g., "last seen just now", "last seen 5 min ago").
   static String lastSeen(DateTime? dateTime) {
     if (dateTime == null) return 'offline';
-    final diff = DateTime.now().difference(dateTime);
+    final local = dateTime.toLocal();
+    final diff = DateTime.now().difference(local);
 
     if (diff.inMinutes < 1) return 'last seen just now';
     if (diff.inMinutes < 60) return 'last seen ${diff.inMinutes} min ago';
     if (diff.inHours < 24) return 'last seen ${diff.inHours}h ago';
-    return 'last seen ${DateFormat('M/d').format(dateTime)}';
+    return 'last seen ${DateFormat('M/d').format(local)}';
   }
 
   /// Format auto-delete timer value to human-readable string.

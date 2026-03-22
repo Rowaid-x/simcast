@@ -1,16 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../config/theme.dart';
 
 /// App settings screen with notification and privacy options.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const _storage = FlutterSecureStorage();
+
+  bool _pushNotifications = true;
+  bool _sound = true;
+  bool _readReceipts = true;
+  bool _onlineStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final push = await _storage.read(key: 'setting_push');
+    final sound = await _storage.read(key: 'setting_sound');
+    final read = await _storage.read(key: 'setting_read_receipts');
+    final online = await _storage.read(key: 'setting_online_status');
+    if (mounted) {
+      setState(() {
+        _pushNotifications = push != 'false';
+        _sound = sound != 'false';
+        _readReceipts = read != 'false';
+        _onlineStatus = online != 'false';
+      });
+    }
+  }
+
+  Future<void> _saveSetting(String key, bool value) async {
+    await _storage.write(key: key, value: value.toString());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -31,8 +69,11 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Push Notifications',
             subtitle: 'Receive message notifications',
             trailing: Switch(
-              value: true,
-              onChanged: (val) {},
+              value: _pushNotifications,
+              onChanged: (val) {
+                setState(() => _pushNotifications = val);
+                _saveSetting('setting_push', val);
+              },
               activeColor: WhisperColors.accent,
             ),
           ),
@@ -41,8 +82,11 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Sound',
             subtitle: 'Play sound for new messages',
             trailing: Switch(
-              value: true,
-              onChanged: (val) {},
+              value: _sound,
+              onChanged: (val) {
+                setState(() => _sound = val);
+                _saveSetting('setting_sound', val);
+              },
               activeColor: WhisperColors.accent,
             ),
           ),
@@ -56,8 +100,11 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Read Receipts',
             subtitle: 'Let others know when you read messages',
             trailing: Switch(
-              value: true,
-              onChanged: (val) {},
+              value: _readReceipts,
+              onChanged: (val) {
+                setState(() => _readReceipts = val);
+                _saveSetting('setting_read_receipts', val);
+              },
               activeColor: WhisperColors.accent,
             ),
           ),
@@ -66,8 +113,11 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Online Status',
             subtitle: 'Show when you are active',
             trailing: Switch(
-              value: true,
-              onChanged: (val) {},
+              value: _onlineStatus,
+              onChanged: (val) {
+                setState(() => _onlineStatus = val);
+                _saveSetting('setting_online_status', val);
+              },
               activeColor: WhisperColors.accent,
             ),
           ),

@@ -16,6 +16,10 @@ final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
   return ConversationRepository(ConversationApi(dio));
 });
 
+/// Tracks the conversation ID the user currently has open.
+/// Set when entering a chat, cleared when leaving.
+final activeConversationIdProvider = StateProvider<String?>((ref) => null);
+
 /// Provider for the conversations list with real-time updates.
 final conversationsProvider =
     AsyncNotifierProvider<ConversationsNotifier, List<Conversation>>(
@@ -52,12 +56,15 @@ class ConversationsNotifier extends AsyncNotifier<List<Conversation>> {
     if (messageData == null) return;
     final msg = Message.fromJson(messageData);
     final currentList = state.valueOrNull ?? [];
+    final activeConvId = ref.read(activeConversationIdProvider);
 
     final updatedList = currentList.map((conv) {
       if (conv.id == msg.conversationId) {
         return conv.copyWith(
           lastMessage: msg,
-          unreadCount: conv.unreadCount + 1,
+          unreadCount: conv.id == activeConvId
+              ? 0
+              : conv.unreadCount + 1,
         );
       }
       return conv;

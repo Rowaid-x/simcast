@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../../config/theme.dart';
@@ -12,17 +11,19 @@ class ConversationTile extends StatelessWidget {
   final Conversation conversation;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onDelete;
 
   const ConversationTile({
     super.key,
     required this.conversation,
     required this.onTap,
     this.onLongPress,
+    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final tile = InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
       child: Container(
@@ -130,6 +131,28 @@ class ConversationTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (onDelete == null) return tile;
+
+    return Dismissible(
+      key: ValueKey(conversation.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        onDelete!();
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: WhisperSpacing.xl),
+        color: WhisperColors.destructive,
+        child: const Icon(
+          LucideIcons.trash2,
+          color: Colors.white,
+          size: 22,
+        ),
+      ),
+      child: tile,
     );
   }
 

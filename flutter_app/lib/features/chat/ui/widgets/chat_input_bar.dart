@@ -13,6 +13,7 @@ class ChatInputBar extends StatefulWidget {
   final Function(bool isTyping) onTypingChanged;
   final Message? replyingTo;
   final VoidCallback? onCancelReply;
+  final VoidCallback? onVoiceRecord;
 
   const ChatInputBar({
     super.key,
@@ -21,6 +22,7 @@ class ChatInputBar extends StatefulWidget {
     required this.onTypingChanged,
     this.replyingTo,
     this.onCancelReply,
+    this.onVoiceRecord,
   });
 
   @override
@@ -69,6 +71,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
         ),
       ),
       builder: (context) => _AttachmentSheet(
+        onVoiceRecord: widget.onVoiceRecord,
         onImageFromCamera: () async {
           Navigator.pop(context);
           final picker = ImagePicker();
@@ -196,9 +199,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       )
                     : IconButton(
                         key: const ValueKey('mic'),
-                        onPressed: () {
-                          // Voice recording — placeholder for now
-                        },
+                        onPressed: widget.onVoiceRecord,
                         icon: const Icon(
                           LucideIcons.mic,
                           color: WhisperColors.textSecondary,
@@ -275,11 +276,13 @@ class _AttachmentSheet extends StatelessWidget {
   final VoidCallback onImageFromCamera;
   final VoidCallback onImageFromGallery;
   final VoidCallback onFile;
+  final VoidCallback? onVoiceRecord;
 
   const _AttachmentSheet({
     required this.onImageFromCamera,
     required this.onImageFromGallery,
     required this.onFile,
+    this.onVoiceRecord,
   });
 
   @override
@@ -321,7 +324,7 @@ class _AttachmentSheet extends StatelessWidget {
                 label: 'Voice',
                 onTap: () {
                   Navigator.pop(context);
-                  // Voice recording handled separately
+                  onVoiceRecord?.call();
                 },
               ),
             ],

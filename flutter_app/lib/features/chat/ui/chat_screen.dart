@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -7,6 +8,7 @@ import '../../../config/theme.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../widgets/avatar.dart';
+import '../../conversations/providers/conversation_provider.dart';
 import '../providers/chat_provider.dart';
 import 'chat_settings_sheet.dart';
 import 'group_info_sheet.dart';
@@ -14,6 +16,7 @@ import 'widgets/auto_delete_badge.dart';
 import 'widgets/chat_input_bar.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/typing_indicator.dart';
+import 'widgets/voice_recorder.dart';
 
 /// Main chat screen for a conversation with real-time messaging.
 class ChatScreen extends ConsumerStatefulWidget {
@@ -43,6 +46,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _currentUserId;
   String? _replyToId;
   int? _currentAutoDeleteTimer;
+  bool _showScrollToBottom = false;
+  bool _isRecordingVoice = false;
 
   @override
   void initState() {
@@ -50,6 +55,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _currentAutoDeleteTimer = widget.autoDeleteTimer;
     _loadUserId();
     _scrollController.addListener(_onScroll);
+    // Mark this conversation as active so unread count doesn't increment
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(activeConversationIdProvider.notifier).state = widget.conversationId;
+    });
   }
 
   Future<void> _loadUserId() async {
@@ -58,14 +67,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _onScroll() {
+    // Load more when near the top (oldest messages)
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       ref.read(chatProvider(widget.conversationId).notifier).loadMore();
     }
+    // Show/hide scroll-to-bottom FAB
+    final shouldShow = _scrollController.position.pixels > 300;
+    if (shouldShow != _showScrollToBottom) {
+      setState(() => _showScrollToBottom = shouldShow);
+    }
+  }
+
+  void _scrollToBottom() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
   void dispose() {
+    // Clear active conversation so unread count resumes
+    ref.read(activeConversationIdProvider.notifier).state = null;
     _scrollController.dispose();
     super.dispose();
   }
@@ -193,26 +218,63 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             // Auto-delete badge
             AutoDeleteBadge(autoDeleteTimer: _currentAutoDeleteTimer),
 
-            // Messages list
+            // Messages list with scroll-to-bottom FAB
             Expanded(
-              child: chatState.isLoading && chatState.messages.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: WhisperColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : chatState.error != null && chatState.messages.isEmpty
-                      ? _buildErrorState(chatState.error!)
-                      : RefreshIndicator(
-                          onRefresh: () => ref
-                              .read(chatProvider(widget.conversationId)
-                                  .notifier)
-                              .refresh(),
-                          color: WhisperColors.accent,
-                          backgroundColor: WhisperColors.surfacePrimary,
-                          child: _buildMessagesList(chatState),
+              child: Stack(
+                children: [
+                  chatState.isLoading && chatState.messages.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: WhisperColors.accent,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : chatState.error != null && chatState.messages.isEmpty
+                          ? _buildErrorState(chatState.error!)
+                          : RefreshIndicator(
+                              onRefresh: () => ref
+                                  .read(chatProvider(widget.conversationId)
+                                      .notifier)
+                                  .refresh(),
+                              color: WhisperColors.accent,
+                              backgroundColor: WhisperColors.surfacePrimary,
+                              child: _buildMessagesList(chatState),
+                            ),
+                  // Scroll-to-bottom FAB
+                  if (_showScrollToBottom)
+                    Positioned(
+                      right: WhisperSpacing.lg,
+                      bottom: WhisperSpacing.lg,
+                      child: GestureDetector(
+                        onTap: _scrollToBottom,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: WhisperColors.surfaceElevated,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: WhisperColors.divider,
+                              width: 0.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            LucideIcons.chevronDown,
+                            color: WhisperColors.textPrimary,
+                            size: 20,
+                          ),
                         ),
+                      ),
+                    ),
+                ],
+              ),
             ),
 
             // Typing indicator
@@ -220,36 +282,54 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               typingUserNames: chatState.typingUsers.keys.toList(),
             ),
 
-            // Input bar
-            ChatInputBar(
-              onSend: (text) {
-                ref
-                    .read(chatProvider(widget.conversationId).notifier)
-                    .sendMessage(
-                      content: text,
-                      replyTo: _replyToId,
-                    );
-                setState(() => _replyToId = null);
-              },
-              onFileSend: (filePath) {
-                ref
-                    .read(chatProvider(widget.conversationId).notifier)
-                    .sendFile(filePath);
-              },
-              onTypingChanged: (isTyping) {
-                ref
-                    .read(chatProvider(widget.conversationId).notifier)
-                    .onTypingChanged(isTyping);
-              },
-              replyingTo: _replyToId != null
-                  ? chatState.messages
-                      .where((m) => m.id == _replyToId)
-                      .firstOrNull
-                  : null,
-              onCancelReply: () {
-                setState(() => _replyToId = null);
-              },
-            ),
+            // Voice recorder overlay or input bar
+            if (_isRecordingVoice)
+              VoiceRecorder(
+                onRecordingComplete: (filePath) {
+                  setState(() => _isRecordingVoice = false);
+                  ref
+                      .read(chatProvider(widget.conversationId).notifier)
+                      .sendFile(filePath);
+                },
+                onCancel: () {
+                  setState(() => _isRecordingVoice = false);
+                },
+              )
+            else
+              ChatInputBar(
+                onSend: (text) {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(chatProvider(widget.conversationId).notifier)
+                      .sendMessage(
+                        content: text,
+                        replyTo: _replyToId,
+                      );
+                  setState(() => _replyToId = null);
+                },
+                onFileSend: (filePath) {
+                  ref
+                      .read(chatProvider(widget.conversationId).notifier)
+                      .sendFile(filePath);
+                },
+                onTypingChanged: (isTyping) {
+                  ref
+                      .read(chatProvider(widget.conversationId).notifier)
+                      .onTypingChanged(isTyping);
+                },
+                replyingTo: _replyToId != null
+                    ? chatState.messages
+                        .where((m) => m.id == _replyToId)
+                        .firstOrNull
+                    : null,
+                onCancelReply: () {
+                  setState(() => _replyToId = null);
+                },
+                onVoiceRecord: () {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _isRecordingVoice = true);
+                },
+              ),
           ],
         ),
       ),
@@ -293,15 +373,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (widget.conversationType == 'direct')
-                  Text(
-                    widget.isOnline ? 'online' : 'offline',
-                    style: WhisperTypography.caption.copyWith(
-                      color: widget.isOnline
-                          ? WhisperColors.success
-                          : WhisperColors.textTertiary,
-                    ),
+                Text(
+                  widget.conversationType == 'direct'
+                      ? (widget.isOnline ? 'online' : 'offline')
+                      : 'group',
+                  style: WhisperTypography.caption.copyWith(
+                    color: widget.isOnline && widget.conversationType == 'direct'
+                        ? WhisperColors.success
+                        : WhisperColors.textTertiary,
                   ),
+                ),
               ],
             ),
           ),
@@ -360,6 +441,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return ListView.builder(
       controller: _scrollController,
       reverse: true,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(vertical: WhisperSpacing.sm),
       itemCount: messages.length + (chatState.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
@@ -411,6 +493,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               isSent: isSent,
               showSenderName: widget.conversationType == 'group',
               onLongPress: () => _showMessageOptions(message, isSent),
+              onRetry: message.isFailed
+                  ? () => ref
+                      .read(chatProvider(widget.conversationId).notifier)
+                      .retryMessage(message.id)
+                  : null,
             ),
           ],
         );
@@ -447,6 +534,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showMessageOptions(message, bool isSent) {
+    HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: WhisperColors.surfacePrimary,
@@ -478,14 +566,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 setState(() => _replyToId = message.id);
               },
             ),
-            ListTile(
-              leading: const Icon(LucideIcons.copy,
-                  color: WhisperColors.textSecondary, size: 20),
-              title: Text('Copy text', style: WhisperTypography.bodyLarge),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
+            if (message.content != null && message.content!.isNotEmpty)
+              ListTile(
+                leading: const Icon(LucideIcons.copy,
+                    color: WhisperColors.textSecondary, size: 20),
+                title: Text('Copy text', style: WhisperTypography.bodyLarge),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: message.content!));
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Copied to clipboard'),
+                      duration: Duration(seconds: 1),
+                      backgroundColor: WhisperColors.surfaceElevated,
+                    ),
+                  );
+                },
+              ),
+            if (isSent)
+              ListTile(
+                leading: const Icon(LucideIcons.info,
+                    color: WhisperColors.textSecondary, size: 20),
+                title: Text('Message info', style: WhisperTypography.bodyLarge),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showMessageInfo(message);
+                },
+              ),
             if (isSent)
               ListTile(
                 leading: const Icon(LucideIcons.trash2,
@@ -495,14 +602,140 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         .copyWith(color: WhisperColors.destructive)),
                 onTap: () {
                   Navigator.pop(context);
-                  ref
-                      .read(chatProvider(widget.conversationId).notifier)
-                      .deleteMessage(message.id);
+                  _confirmDeleteMessage(message.id);
                 },
               ),
             const SizedBox(height: WhisperSpacing.lg),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showMessageInfo(message) {
+    final sentTime = DateFormatter.messageTime(message.createdAt);
+    final sentDate = DateFormatter.dateSeparator(message.createdAt);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: WhisperColors.surfacePrimary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(WhisperRadius.xl),
+        ),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(WhisperSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: WhisperColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: WhisperSpacing.xl),
+              Text('Message Info', style: WhisperTypography.heading3),
+              const SizedBox(height: WhisperSpacing.xl),
+              // Read status
+              Row(
+                children: [
+                  Icon(
+                    message.isRead ? LucideIcons.checkCheck : LucideIcons.check,
+                    size: 20,
+                    color: message.isRead
+                        ? WhisperColors.accent
+                        : WhisperColors.textTertiary,
+                  ),
+                  const SizedBox(width: WhisperSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message.isRead ? 'Read' : 'Delivered',
+                          style: WhisperTypography.bodyLarge.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // TODO: Show actual read timestamp when backend supports it
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: WhisperSpacing.lg),
+              const Divider(color: WhisperColors.divider),
+              const SizedBox(height: WhisperSpacing.lg),
+              // Sent time
+              Row(
+                children: [
+                  const Icon(
+                    LucideIcons.send,
+                    size: 20,
+                    color: WhisperColors.textTertiary,
+                  ),
+                  const SizedBox(width: WhisperSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Sent', style: WhisperTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w600,
+                        )),
+                        Text(
+                          '$sentDate at $sentTime',
+                          style: WhisperTypography.caption.copyWith(
+                            color: WhisperColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: WhisperSpacing.lg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteMessage(String messageId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: WhisperColors.surfaceElevated,
+        title: Text('Delete message?', style: WhisperTypography.heading3),
+        content: Text(
+          'This message will be permanently deleted.',
+          style: WhisperTypography.bodyMedium.copyWith(
+            color: WhisperColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref
+                  .read(chatProvider(widget.conversationId).notifier)
+                  .deleteMessage(messageId);
+            },
+            child: Text(
+              'Delete',
+              style: TextStyle(color: WhisperColors.destructive),
+            ),
+          ),
+        ],
       ),
     );
   }

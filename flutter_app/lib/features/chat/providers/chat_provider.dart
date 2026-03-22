@@ -203,9 +203,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
         // Replace optimistic message with the real one
         _replaceOptimistic(tempId, message);
       } catch (e) {
-        // Remove the optimistic message on failure
-        _removeMessage(tempId);
-        state = state.copyWith(error: 'Failed to send message');
+        // Mark the optimistic message as failed so user can retry
+        _markFailed(tempId);
       }
     }
 
@@ -355,6 +354,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void _removeMessage(String messageId) {
     final updated = state.messages.where((m) => m.id != messageId).toList();
     state = state.copyWith(messages: updated);
+  }
+
+  void _markFailed(String messageId) {
+    final updated = state.messages.map((m) {
+      if (m.id == messageId) return m.copyWith(isFailed: true);
+      return m;
+    }).toList();
+    state = state.copyWith(messages: updated);
+  }
+
+  /// Retry sending a failed message.
+  Future<void> retryMessage(String messageId) async {
+    final failedMsg = state.messages.where((m) => m.id == messageId).firstOrNull;
+    if (failedMsg == null) return;
+
+    // Remove the failed message
+    _removeMessage(messageId);
+
+    // Re-send it
+    await sendMessage(
+      content: failedMsg.content ?? '',
+      messageType: failedMsg.messageType,
+      replyTo: failedMsg.replyTo,
+      fileUrl: failedMsg.fileUrl,
+      fileName: failedMsg.fileName,
+      fileSize: failedMsg.fileSize,
+      fileMimeType: failedMsg.fileMimeType,
+    );
   }
 
   void _handleTyping(Map<String, dynamic> data) {

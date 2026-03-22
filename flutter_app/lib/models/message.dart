@@ -17,6 +17,7 @@ class Message extends Equatable {
   final DateTime? expiresAt;
   final bool isDeleted;
   final bool isRead;
+  final bool isFailed;
   final DateTime createdAt;
 
   const Message({
@@ -34,6 +35,7 @@ class Message extends Equatable {
     this.expiresAt,
     this.isDeleted = false,
     this.isRead = false,
+    this.isFailed = false,
     required this.createdAt,
   });
 
@@ -65,7 +67,7 @@ class Message extends Equatable {
     );
   }
 
-  Message copyWith({bool? isRead}) {
+  Message copyWith({bool? isRead, bool? isFailed}) {
     return Message(
       id: id,
       conversationId: conversationId,
@@ -81,6 +83,7 @@ class Message extends Equatable {
       expiresAt: expiresAt,
       isDeleted: isDeleted,
       isRead: isRead ?? this.isRead,
+      isFailed: isFailed ?? this.isFailed,
       createdAt: createdAt,
     );
   }

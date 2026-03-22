@@ -105,7 +105,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     try {
       final dio = ref.read(apiClientProvider);
-      final response = await dio.patch('/users/me/', data: {
+      await dio.patch('/users/me/', data: {
         'display_name': _nameController.text.trim(),
         'bio': _bioController.text.trim(),
       });
