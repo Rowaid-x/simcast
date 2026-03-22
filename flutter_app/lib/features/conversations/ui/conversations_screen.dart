@@ -115,6 +115,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
     final conversationsAsync = ref.watch(conversationsProvider);
     final authState = ref.watch(authStateProvider);
     final currentUser = authState.valueOrNull;
+    final typingConvs = ref.watch(typingConversationsProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -237,6 +238,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                         final conversation = filtered[index];
                         return ConversationTile(
                           conversation: conversation,
+                          isTyping: typingConvs.containsKey(conversation.id),
                           onTap: () {
                             // Mark as read
                             ref

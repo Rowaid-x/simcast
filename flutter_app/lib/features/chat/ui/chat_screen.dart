@@ -68,7 +68,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   /// Mark all messages as read and scroll to oldest unread on first load.
-  void _markReadAndScrollToUnread() {
+  Future<void> _markReadAndScrollToUnread() async {
     if (_hasMarkedRead || _currentUserId == null) return;
     final chatNotifier = ref.read(chatProvider(widget.conversationId).notifier);
     final chatState = ref.read(chatProvider(widget.conversationId));
@@ -77,8 +77,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Find first unread index BEFORE marking all as read
     final unreadIdx = chatNotifier.firstUnreadIndex(_currentUserId!);
 
-    // Mark all as read
-    chatNotifier.markAllAsRead(_currentUserId!);
+    // Mark all as read (async with REST fallback if WS is down)
+    await chatNotifier.markAllAsRead(_currentUserId!);
     _hasMarkedRead = true;
 
     // Also clear unread badge in conversation list
@@ -127,6 +127,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     // Clear active conversation so unread count resumes
     ref.read(activeConversationIdProvider.notifier).state = null;
+    // Sync server-side unread count back to the conversation list
+    ref.read(conversationsProvider.notifier).refresh();
     _scrollController.dispose();
     super.dispose();
   }

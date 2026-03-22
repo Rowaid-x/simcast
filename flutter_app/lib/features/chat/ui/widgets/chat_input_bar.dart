@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../config/theme.dart';
 import '../../../../models/message.dart';
@@ -32,6 +36,7 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _picker = ImagePicker();
   bool _hasText = false;
 
   @override
@@ -61,6 +66,28 @@ class _ChatInputBarState extends State<ChatInputBar> {
     _focusNode.requestFocus();
   }
 
+  /// Pick image with requestFullMetadata:false to strip iPhone P3 ICC profile
+  /// (fixes green tint on HEIC photos).
+  Future<String?> _pickImageFixed(ImageSource source) async {
+    final xfile = await _picker.pickImage(
+      source: source,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      imageQuality: 88,
+      requestFullMetadata: false,
+    );
+    if (xfile == null) return null;
+    final ext = path.extension(xfile.path).toLowerCase();
+    if (ext == '.heic' || ext == '.heif') {
+      final tmpDir = await getTemporaryDirectory();
+      final dest =
+          '${tmpDir.path}/${path.basenameWithoutExtension(xfile.path)}.jpg';
+      await File(xfile.path).copy(dest);
+      return dest;
+    }
+    return xfile.path;
+  }
+
   void _showAttachmentSheet() {
     showModalBottomSheet(
       context: context,
@@ -70,32 +97,30 @@ class _ChatInputBarState extends State<ChatInputBar> {
           top: Radius.circular(WhisperRadius.xl),
         ),
       ),
-      builder: (context) => _AttachmentSheet(
+      builder: (ctx) => _AttachmentSheet(
         onVoiceRecord: widget.onVoiceRecord,
         onImageFromCamera: () async {
-          Navigator.pop(context);
-          final picker = ImagePicker();
-          final image = await picker.pickImage(
-            source: ImageSource.camera,
-            maxWidth: 1920,
-            maxHeight: 1920,
-            imageQuality: 85,
-          );
-          if (image != null) widget.onFileSend(image.path);
+          Navigator.pop(ctx);
+          final p = await _pickImageFixed(ImageSource.camera);
+          if (p != null) widget.onFileSend(p);
         },
         onImageFromGallery: () async {
-          Navigator.pop(context);
-          final picker = ImagePicker();
-          final image = await picker.pickImage(
-            source: ImageSource.gallery,
-            maxWidth: 1920,
-            maxHeight: 1920,
-            imageQuality: 85,
-          );
-          if (image != null) widget.onFileSend(image.path);
+          Navigator.pop(ctx);
+          final p = await _pickImageFixed(ImageSource.gallery);
+          if (p != null) widget.onFileSend(p);
+        },
+        onVideoFromGallery: () async {
+          Navigator.pop(ctx);
+          final xfile = await _picker.pickVideo(source: ImageSource.gallery);
+          if (xfile != null) widget.onFileSend(xfile.path);
+        },
+        onVideoFromCamera: () async {
+          Navigator.pop(ctx);
+          final xfile = await _picker.pickVideo(source: ImageSource.camera);
+          if (xfile != null) widget.onFileSend(xfile.path);
         },
         onFile: () async {
-          Navigator.pop(context);
+          Navigator.pop(ctx);
           final result = await FilePicker.platform.pickFiles(
             allowMultiple: false,
             type: FileType.any,
@@ -121,13 +146,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Reply preview bar
           if (widget.replyingTo != null) _buildReplyBar(),
-
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Attachment button
               IconButton(
                 onPressed: _showAttachmentSheet,
                 icon: const Icon(
@@ -139,8 +161,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 constraints: const BoxConstraints(),
               ),
               const SizedBox(width: WhisperSpacing.xs),
-
-              // Text input
               Expanded(
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 120),
@@ -170,13 +190,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 ),
               ),
               const SizedBox(width: WhisperSpacing.xs),
-
-              // Send / Mic button
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                transitionBuilder: (child, animation) {
-                  return ScaleTransition(scale: animation, child: child);
-                },
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
                 child: _hasText
                     ? IconButton(
                         key: const ValueKey('send'),
@@ -248,9 +265,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   reply.content ?? 'Attachment',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: WhisperTypography.caption.copyWith(
-                    color: WhisperColors.textSecondary,
-                  ),
+                  style: WhisperTypography.caption
+                      .copyWith(color: WhisperColors.textSecondary),
                 ),
               ],
             ),
@@ -271,16 +287,20 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 }
 
-/// Attachment options bottom sheet with a 2x2 grid.
+/// Attachment options bottom sheet.
 class _AttachmentSheet extends StatelessWidget {
   final VoidCallback onImageFromCamera;
   final VoidCallback onImageFromGallery;
+  final VoidCallback onVideoFromGallery;
+  final VoidCallback onVideoFromCamera;
   final VoidCallback onFile;
   final VoidCallback? onVoiceRecord;
 
   const _AttachmentSheet({
     required this.onImageFromCamera,
     required this.onImageFromGallery,
+    required this.onVideoFromGallery,
+    required this.onVideoFromCamera,
     required this.onFile,
     this.onVoiceRecord,
   });
@@ -311,8 +331,24 @@ class _AttachmentSheet extends StatelessWidget {
               ),
               _AttachmentOption(
                 icon: LucideIcons.image,
-                label: 'Gallery',
+                label: 'Photo',
                 onTap: onImageFromGallery,
+              ),
+              _AttachmentOption(
+                icon: LucideIcons.video,
+                label: 'Video',
+                onTap: onVideoFromGallery,
+              ),
+            ],
+          ),
+          const SizedBox(height: WhisperSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _AttachmentOption(
+                icon: LucideIcons.clapperboard,
+                label: 'Record',
+                onTap: onVideoFromCamera,
               ),
               _AttachmentOption(
                 icon: LucideIcons.file,
@@ -329,7 +365,10 @@ class _AttachmentSheet extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + WhisperSpacing.lg),
+          SizedBox(
+            height:
+                MediaQuery.of(context).padding.bottom + WhisperSpacing.lg,
+          ),
         ],
       ),
     );
@@ -361,17 +400,10 @@ class _AttachmentOption extends StatelessWidget {
               color: WhisperColors.accent.withOpacity(0.12),
               borderRadius: BorderRadius.circular(WhisperRadius.lg),
             ),
-            child: Icon(
-              icon,
-              color: WhisperColors.accent,
-              size: 24,
-            ),
+            child: Icon(icon, color: WhisperColors.accent, size: 24),
           ),
           const SizedBox(height: WhisperSpacing.sm),
-          Text(
-            label,
-            style: WhisperTypography.caption,
-          ),
+          Text(label, style: WhisperTypography.caption),
         ],
       ),
     );

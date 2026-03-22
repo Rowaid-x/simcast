@@ -10,6 +10,28 @@ import '../../../models/user.dart';
 import '../data/conversation_api.dart';
 import '../data/conversation_repository.dart';
 
+/// A lightweight notification shown as an in-app banner.
+class InAppNotification {
+  final String conversationId;
+  final String conversationName;
+  final String messagePreview;
+  final String? senderName;
+
+  const InAppNotification({
+    required this.conversationId,
+    required this.conversationName,
+    required this.messagePreview,
+    this.senderName,
+  });
+}
+
+/// Broadcast stream for in-app notification banners.
+final inAppNotificationStream = StreamController<InAppNotification>.broadcast();
+
+/// Tracks which conversations have active typers (used in conversation list).
+final typingConversationsProvider =
+    StateProvider<Map<String, List<String>>>((ref) => {});
+
 /// Provider for the ConversationRepository.
 final conversationRepositoryProvider = Provider<ConversationRepository>((ref) {
   final dio = ref.watch(apiClientProvider);
@@ -58,13 +80,26 @@ class ConversationsNotifier extends AsyncNotifier<List<Conversation>> {
     final currentList = state.valueOrNull ?? [];
     final activeConvId = ref.read(activeConversationIdProvider);
 
+    // Fire in-app banner for messages in background conversations
+    if (msg.conversationId != activeConvId) {
+      final conv =
+          currentList.where((c) => c.id == msg.conversationId).firstOrNull;
+      if (conv != null) {
+        inAppNotificationStream.add(InAppNotification(
+          conversationId: conv.id,
+          conversationName: conv.displayName,
+          senderName: msg.sender?.displayName,
+          messagePreview: _messagePreview(msg),
+        ));
+      }
+    }
+
     final updatedList = currentList.map((conv) {
       if (conv.id == msg.conversationId) {
         return conv.copyWith(
           lastMessage: msg,
-          unreadCount: conv.id == activeConvId
-              ? 0
-              : conv.unreadCount + 1,
+          unreadCount:
+              conv.id == activeConvId ? 0 : conv.unreadCount + 1,
         );
       }
       return conv;
@@ -78,6 +113,22 @@ class ConversationsNotifier extends AsyncNotifier<List<Conversation>> {
     });
 
     state = AsyncData(updatedList);
+  }
+
+  String _messagePreview(Message msg) {
+    if (msg.isDeleted) return 'Message deleted';
+    switch (msg.messageType) {
+      case 'image':
+        return '📷 Photo';
+      case 'video':
+        return '🎬 Video';
+      case 'voice':
+        return '🎤 Voice message';
+      case 'file':
+        return '📎 ${msg.fileName ?? "File"}';
+      default:
+        return msg.content ?? '';
+    }
   }
 
   /// Refresh the conversations list from the server.

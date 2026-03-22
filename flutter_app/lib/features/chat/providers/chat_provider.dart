@@ -8,10 +8,14 @@ import '../../../core/network/websocket_client.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../models/message.dart';
 import '../../../models/user.dart';
+import '../../conversations/providers/conversation_provider.dart';
 import '../data/message_api.dart';
 import '../data/message_repository.dart';
 
 const _uuid = Uuid();
+
+/// In-memory cache so re-opening a conversation shows messages instantly.
+final _messageCache = <String, List<Message>>{};
 
 /// Provider for the MessageRepository.
 final messageRepositoryProvider = Provider<MessageRepository>((ref) {
@@ -81,7 +85,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   bool _isTypingSent = false;
 
   ChatNotifier(this._ref, this.conversationId)
-      : super(const ChatState(isLoading: true)) {
+      : super(ChatState(
+          messages: _messageCache[conversationId] ?? const [],
+          isLoading: true,
+        )) {
     _subscribeToWebSocket();
     Future.microtask(() => _loadInitialMessages());
   }
@@ -101,11 +108,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
   /// Load the first page of messages.
   Future<void> _loadInitialMessages() async {
     if (!mounted) return;
-    state = state.copyWith(isLoading: true, error: null);
+    if (_messageCache[conversationId] == null) {
+      state = state.copyWith(isLoading: true, error: null);
+    }
     try {
       final repo = _ref.read(messageRepositoryProvider);
-      final page = await repo.getMessages(conversationId);
+      final page = await repo.getMessages(conversationId, pageSize: 50);
       if (!mounted) return;
+      _messageCache[conversationId] = page.messages;
       state = state.copyWith(
         messages: page.messages,
         isLoading: false,
@@ -224,6 +234,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
         msgType = 'image';
       } else if (result.mimeType.startsWith('audio/')) {
         msgType = 'voice';
+      } else if (result.mimeType.startsWith('video/')) {
+        msgType = 'video';
       }
 
       await sendMessage(
@@ -276,23 +288,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   /// Mark ALL unread received messages as read (called when opening chat).
-  void markAllAsRead(String currentUserId) {
+  Future<void> markAllAsRead(String currentUserId) async {
     final unread = state.messages
-        .where((m) => !m.isRead && m.sender?.id != currentUserId)
+        .where(
+          (m) =>
+              !m.isRead &&
+              m.sender?.id != currentUserId &&
+              !m.id.startsWith('temp_'),
+        )
         .toList();
     if (unread.isEmpty) return;
 
-    final wsClient = _ref.read(webSocketClientProvider);
-    for (final msg in unread) {
-      try {
-        wsClient.sendReadReceipt(
-          conversationId: conversationId,
-          messageId: msg.id,
-        );
-      } catch (_) {}
-    }
-
-    // Locally mark all as read immediately
+    // Update UI immediately
     final updated = state.messages.map((m) {
       if (!m.isRead && m.sender?.id != currentUserId) {
         return m.copyWith(isRead: true);
@@ -300,6 +307,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return m;
     }).toList();
     state = state.copyWith(messages: updated);
+
+    // Persist via WebSocket or REST fallback
+    final wsClient = _ref.read(webSocketClientProvider);
+    final isWsConnected = wsClient.state == WsConnectionState.connected;
+    final repo = _ref.read(messageRepositoryProvider);
+
+    for (final msg in unread) {
+      try {
+        if (isWsConnected) {
+          wsClient.sendReadReceipt(
+            conversationId: conversationId,
+            messageId: msg.id,
+          );
+        } else {
+          await repo.markAsRead(msg.id);
+        }
+      } catch (_) {}
+    }
   }
 
   /// Returns the index of the first unread message (in the reversed list used by ListView).
@@ -431,13 +456,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final isTyping = data['is_typing'] as bool? ?? false;
     final displayName = data['display_name'] as String? ?? '';
 
+    final key = displayName.isNotEmpty ? displayName : userId;
     final updatedTyping = Map<String, bool>.from(state.typingUsers);
     if (isTyping) {
-      updatedTyping[displayName.isNotEmpty ? displayName : userId] = true;
+      updatedTyping[key] = true;
     } else {
-      updatedTyping.remove(displayName.isNotEmpty ? displayName : userId);
+      updatedTyping.remove(key);
     }
     state = state.copyWith(typingUsers: updatedTyping);
+
+    // Update the conversation-list typing indicator
+    try {
+      final typingMap = Map<String, List<String>>.from(
+        _ref.read(typingConversationsProvider),
+      );
+      if (updatedTyping.isEmpty) {
+        typingMap.remove(conversationId);
+      } else {
+        typingMap[conversationId] = updatedTyping.keys.toList();
+      }
+      _ref.read(typingConversationsProvider.notifier).state = typingMap;
+    } catch (_) {}
   }
 
   void _handleReadReceipt(Map<String, dynamic> data) {

@@ -67,6 +67,16 @@ class DateFormatter {
     return '${seconds}s';
   }
 
+  /// Format expiry countdown for messages close to auto-delete.
+  /// Returns null if > 1 hour away or no expiry; returns "Xm" or "Xs" if < 1 hour.
+  static String? expiryCountdown(DateTime? expiresAt) {
+    if (expiresAt == null) return null;
+    final remaining = expiresAt.toLocal().difference(DateTime.now());
+    if (remaining.isNegative || remaining.inHours >= 1) return null;
+    if (remaining.inMinutes >= 1) return '${remaining.inMinutes}m';
+    return '${remaining.inSeconds}s';
+  }
+
   /// Format file size (e.g., "1.5 MB", "256 KB").
   static String fileSize(int? bytes) {
     if (bytes == null) return '';

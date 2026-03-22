@@ -24,6 +24,10 @@ class FileHelper {
     'text/csv',
     'video/mp4',
     'video/webm',
+    'video/quicktime',
+    'video/x-m4v',
+    'image/heic',
+    'image/heif',
   };
 
   /// Max file size in bytes (25 MB).
@@ -72,7 +76,7 @@ class FileHelper {
     if (mimeType == null) return 'file';
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType.startsWith('audio/')) return 'voice';
-    if (mimeType.startsWith('video/')) return 'file';
+    if (mimeType.startsWith('video/')) return 'video';
     return 'file';
   }
 

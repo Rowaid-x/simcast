@@ -11,8 +11,13 @@ class MessageRepository {
   Future<MessagePage> getMessages(
     String conversationId, {
     String? cursor,
+    int pageSize = 30,
   }) async {
-    final data = await _api.getMessages(conversationId, cursor: cursor);
+    final data = await _api.getMessages(
+      conversationId,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
     final results = (data['results'] as List?) ?? [];
     final messages = results
         .map((json) => Message.fromJson(json as Map<String, dynamic>))

@@ -12,6 +12,7 @@ class ConversationTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final VoidCallback? onDelete;
+  final bool isTyping;
 
   const ConversationTile({
     super.key,
@@ -19,6 +20,7 @@ class ConversationTile extends StatelessWidget {
     required this.onTap,
     this.onLongPress,
     this.onDelete,
+    this.isTyping = false,
   });
 
   @override
@@ -61,11 +63,15 @@ class ConversationTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _getLastMessagePreview(),
+                    isTyping ? 'typing...' : _getLastMessagePreview(),
                     style: WhisperTypography.bodyMedium.copyWith(
-                      color: conversation.unreadCount > 0
-                          ? WhisperColors.textPrimary
-                          : WhisperColors.textSecondary,
+                      color: isTyping
+                          ? WhisperColors.accent
+                          : conversation.unreadCount > 0
+                              ? WhisperColors.textPrimary
+                              : WhisperColors.textSecondary,
+                      fontStyle:
+                          isTyping ? FontStyle.italic : FontStyle.normal,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -164,6 +170,8 @@ class ConversationTile extends StatelessWidget {
     switch (msg.messageType) {
       case 'image':
         return '📷 Photo';
+      case 'video':
+        return '🎬 Video';
       case 'voice':
         return '🎤 Voice message';
       case 'file':
