@@ -275,6 +275,45 @@ class ChatNotifier extends StateNotifier<ChatState> {
     } catch (_) {}
   }
 
+  /// Mark ALL unread received messages as read (called when opening chat).
+  void markAllAsRead(String currentUserId) {
+    final unread = state.messages
+        .where((m) => !m.isRead && m.sender?.id != currentUserId)
+        .toList();
+    if (unread.isEmpty) return;
+
+    final wsClient = _ref.read(webSocketClientProvider);
+    for (final msg in unread) {
+      try {
+        wsClient.sendReadReceipt(
+          conversationId: conversationId,
+          messageId: msg.id,
+        );
+      } catch (_) {}
+    }
+
+    // Locally mark all as read immediately
+    final updated = state.messages.map((m) {
+      if (!m.isRead && m.sender?.id != currentUserId) {
+        return m.copyWith(isRead: true);
+      }
+      return m;
+    }).toList();
+    state = state.copyWith(messages: updated);
+  }
+
+  /// Returns the index of the first unread message (in the reversed list used by ListView).
+  /// Messages are stored newest-first, so we search from the end to find the oldest unread.
+  int? firstUnreadIndex(String currentUserId) {
+    for (int i = state.messages.length - 1; i >= 0; i--) {
+      final m = state.messages[i];
+      if (!m.isRead && m.sender?.id != currentUserId) {
+        return i;
+      }
+    }
+    return null;
+  }
+
   /// Delete a message.
   Future<void> deleteMessage(String messageId) async {
     try {

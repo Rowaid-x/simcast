@@ -48,6 +48,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int? _currentAutoDeleteTimer;
   bool _showScrollToBottom = false;
   bool _isRecordingVoice = false;
+  bool _hasMarkedRead = false;
 
   @override
   void initState() {
@@ -64,6 +65,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _loadUserId() async {
     final userId = await SecureStorage.getUserId();
     if (mounted) setState(() => _currentUserId = userId);
+  }
+
+  /// Mark all messages as read and scroll to oldest unread on first load.
+  void _markReadAndScrollToUnread() {
+    if (_hasMarkedRead || _currentUserId == null) return;
+    final chatNotifier = ref.read(chatProvider(widget.conversationId).notifier);
+    final chatState = ref.read(chatProvider(widget.conversationId));
+    if (chatState.messages.isEmpty) return;
+
+    // Find first unread index BEFORE marking all as read
+    final unreadIdx = chatNotifier.firstUnreadIndex(_currentUserId!);
+
+    // Mark all as read
+    chatNotifier.markAllAsRead(_currentUserId!);
+    _hasMarkedRead = true;
+
+    // Also clear unread badge in conversation list
+    ref.read(conversationsProvider.notifier).markAsRead(widget.conversationId);
+
+    // Scroll to the oldest unread message if it's not visible
+    if (unreadIdx != null && unreadIdx > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          // Each message is roughly 70px tall; estimate position
+          // Using animateTo with index * estimated height
+          final targetOffset = unreadIdx * 72.0;
+          final maxScroll = _scrollController.position.maxScrollExtent;
+          _scrollController.animateTo(
+            targetOffset.clamp(0, maxScroll),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   void _onScroll() {
@@ -197,6 +233,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider(widget.conversationId));
+
+    // Mark all messages as read and scroll to first unread on initial load
+    if (!_hasMarkedRead && chatState.messages.isNotEmpty && _currentUserId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _markReadAndScrollToUnread();
+      });
+    }
 
     // React to real-time timer updates from WebSocket
     if (chatState.timerUpdated &&
@@ -476,13 +519,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         } else {
           // First message (oldest) always has a date separator
           dateSeparator = _buildDateSeparator(message.createdAt);
-        }
-
-        // Mark as read if it's a received message
-        if (!isSent && !message.isRead) {
-          ref
-              .read(chatProvider(widget.conversationId).notifier)
-              .markAsRead(message.id);
         }
 
         return Column(

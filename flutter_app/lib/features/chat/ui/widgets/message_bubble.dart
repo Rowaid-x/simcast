@@ -120,6 +120,15 @@ class MessageBubble extends StatelessWidget {
                     bottomRight: Radius.circular(
                         isSent ? WhisperRadius.sm : WhisperRadius.lg),
                   ),
+                  // Colored left border for group received messages
+                  border: (showSenderName && !isSent && message.sender != null)
+                      ? Border(
+                          left: BorderSide(
+                            color: _senderColor(),
+                            width: 3,
+                          ),
+                        )
+                      : null,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.only(
