@@ -19,10 +19,11 @@ from .serializers import MessageListSerializer, CreateMessageSerializer
 
 ALLOWED_MIME_TYPES = {
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'image/heic', 'image/heif',
     'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/mp4',
     'application/pdf', 'application/zip',
     'text/plain', 'text/csv',
-    'video/mp4', 'video/webm',
+    'video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v',
 }
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB
 
