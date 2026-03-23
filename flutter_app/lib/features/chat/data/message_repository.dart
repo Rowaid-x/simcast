@@ -68,6 +68,14 @@ class MessageRepository {
     await _api.markAllAsRead(conversationId);
   }
 
+  /// Get who read a message (for group chats).
+  Future<List<ReadByEntry>> getReadBy(String messageId) async {
+    final data = await _api.getReadBy(messageId);
+    return data
+        .map((json) => ReadByEntry.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Upload a file and return metadata.
   Future<FileUploadResult> uploadFile(String filePath) async {
     final data = await _api.uploadFile(filePath);
@@ -108,4 +116,29 @@ class FileUploadResult {
     required this.fileSize,
     required this.mimeType,
   });
+}
+
+/// A single read receipt entry showing who read a message and when.
+class ReadByEntry {
+  final String userId;
+  final String displayName;
+  final String? avatarUrl;
+  final DateTime readAt;
+
+  ReadByEntry({
+    required this.userId,
+    required this.displayName,
+    this.avatarUrl,
+    required this.readAt,
+  });
+
+  factory ReadByEntry.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>;
+    return ReadByEntry(
+      userId: user['id'] as String,
+      displayName: user['display_name'] as String? ?? 'Unknown',
+      avatarUrl: user['avatar_url'] as String?,
+      readAt: DateTime.parse(json['read_at'] as String),
+    );
+  }
 }

@@ -65,6 +65,12 @@ class MessageApi {
     await _dio.post('/conversations/$conversationId/messages/read-all/');
   }
 
+  /// Get who read a message (for group chats).
+  Future<List<dynamic>> getReadBy(String messageId) async {
+    final response = await _dio.get('/messages/$messageId/read-by/');
+    return response.data as List<dynamic>;
+  }
+
   /// Upload a file.
   Future<Map<String, dynamic>> uploadFile(String filePath) async {
     final formData = FormData.fromMap({

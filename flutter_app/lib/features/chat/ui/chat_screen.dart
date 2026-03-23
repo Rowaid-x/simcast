@@ -9,6 +9,7 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../widgets/avatar.dart';
 import '../../conversations/providers/conversation_provider.dart';
+import '../data/message_repository.dart';
 import '../providers/chat_provider.dart';
 import 'chat_settings_sheet.dart';
 import 'group_info_sheet.dart';
@@ -661,10 +662,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _showMessageInfo(message) {
     final sentTime = DateFormatter.messageTime(message.createdAt);
     final sentDate = DateFormatter.dateSeparator(message.createdAt);
+    final isGroup = widget.conversationType == 'group';
 
     showModalBottomSheet(
       context: context,
       backgroundColor: WhisperColors.surfacePrimary,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(WhisperRadius.xl),
@@ -687,33 +690,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               const SizedBox(height: WhisperSpacing.xl),
               Text('Message Info', style: WhisperTypography.heading3),
               const SizedBox(height: WhisperSpacing.xl),
-              // Read status
-              Row(
-                children: [
-                  Icon(
-                    message.isRead ? LucideIcons.checkCheck : LucideIcons.check,
-                    size: 20,
-                    color: message.isRead
-                        ? WhisperColors.accent
-                        : WhisperColors.textTertiary,
-                  ),
-                  const SizedBox(width: WhisperSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          message.isRead ? 'Read' : 'Delivered',
-                          style: WhisperTypography.bodyLarge.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        // TODO: Show actual read timestamp when backend supports it
-                      ],
+
+              // Read status / read-by list for groups
+              if (isGroup)
+                _GroupReadBySection(
+                  messageId: message.id,
+                  repo: ref.read(messageRepositoryProvider),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Icon(
+                      message.isRead ? LucideIcons.checkCheck : LucideIcons.check,
+                      size: 20,
+                      color: message.isRead
+                          ? WhisperColors.accent
+                          : WhisperColors.textTertiary,
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: WhisperSpacing.md),
+                    Expanded(
+                      child: Text(
+                        message.isRead ? 'Read' : 'Delivered',
+                        style: WhisperTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
               const SizedBox(height: WhisperSpacing.lg),
               const Divider(color: WhisperColors.divider),
               const SizedBox(height: WhisperSpacing.lg),
@@ -810,6 +816,117 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Fetches and displays who read a message in group chats.
+class _GroupReadBySection extends StatefulWidget {
+  final String messageId;
+  final MessageRepository repo;
+
+  const _GroupReadBySection({
+    required this.messageId,
+    required this.repo,
+  });
+
+  @override
+  State<_GroupReadBySection> createState() => _GroupReadBySectionState();
+}
+
+class _GroupReadBySectionState extends State<_GroupReadBySection> {
+  List<ReadByEntry>? _entries;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final entries = await widget.repo.getReadBy(widget.messageId);
+      if (mounted) setState(() { _entries = entries; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: WhisperSpacing.lg),
+        child: Center(
+          child: SizedBox(
+            width: 20, height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: WhisperColors.accent),
+          ),
+        ),
+      );
+    }
+
+    if (_entries == null || _entries!.isEmpty) {
+      return Row(
+        children: [
+          const Icon(LucideIcons.check, size: 20, color: WhisperColors.textTertiary),
+          const SizedBox(width: WhisperSpacing.md),
+          Text(
+            'Not read yet',
+            style: WhisperTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(LucideIcons.checkCheck, size: 20, color: WhisperColors.accent),
+            const SizedBox(width: WhisperSpacing.md),
+            Text(
+              'Read by ${_entries!.length}',
+              style: WhisperTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: WhisperSpacing.md),
+        ..._entries!.map((entry) => Padding(
+          padding: const EdgeInsets.only(bottom: WhisperSpacing.sm),
+          child: Row(
+            children: [
+              WhisperAvatar(
+                imageUrl: entry.avatarUrl,
+                name: entry.displayName,
+                size: 32,
+              ),
+              const SizedBox(width: WhisperSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.displayName,
+                      style: WhisperTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '${DateFormatter.dateSeparator(entry.readAt)} at ${DateFormatter.messageTime(entry.readAt)}',
+                      style: WhisperTypography.caption.copyWith(
+                        color: WhisperColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        )),
+      ],
     );
   }
 }
