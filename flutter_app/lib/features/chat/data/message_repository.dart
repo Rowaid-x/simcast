@@ -63,6 +63,11 @@ class MessageRepository {
     await _api.markAsRead(messageId);
   }
 
+  /// Mark all messages in a conversation as read.
+  Future<void> markAllAsRead(String conversationId) async {
+    await _api.markAllAsRead(conversationId);
+  }
+
   /// Upload a file and return metadata.
   Future<FileUploadResult> uploadFile(String filePath) async {
     final data = await _api.uploadFile(filePath);

@@ -289,16 +289,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   /// Mark ALL unread received messages as read (called when opening chat).
   Future<void> markAllAsRead(String currentUserId) async {
-    final unread = state.messages
-        .where(
-          (m) =>
-              !m.isRead &&
-              m.sender?.id != currentUserId &&
-              !m.id.startsWith('temp_'),
-        )
-        .toList();
-    if (unread.isEmpty) return;
-
     // Update UI immediately
     final updated = state.messages.map((m) {
       if (!m.isRead && m.sender?.id != currentUserId) {
@@ -308,22 +298,31 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }).toList();
     state = state.copyWith(messages: updated);
 
-    // Persist via WebSocket or REST fallback
-    final wsClient = _ref.read(webSocketClientProvider);
-    final isWsConnected = wsClient.state == WsConnectionState.connected;
-    final repo = _ref.read(messageRepositoryProvider);
-
-    for (final msg in unread) {
-      try {
-        if (isWsConnected) {
-          wsClient.sendReadReceipt(
-            conversationId: conversationId,
-            messageId: msg.id,
-          );
-        } else {
-          await repo.markAsRead(msg.id);
+    // Single REST call to mark all messages as read on the server
+    try {
+      final repo = _ref.read(messageRepositoryProvider);
+      await repo.markAllAsRead(conversationId);
+    } catch (_) {
+      // Fallback: send individual read receipts via WebSocket
+      final wsClient = _ref.read(webSocketClientProvider);
+      if (wsClient.state == WsConnectionState.connected) {
+        final unread = state.messages
+            .where(
+              (m) =>
+                  !m.isRead &&
+                  m.sender?.id != currentUserId &&
+                  !m.id.startsWith('temp_'),
+            )
+            .toList();
+        for (final msg in unread) {
+          try {
+            wsClient.sendReadReceipt(
+              conversationId: conversationId,
+              messageId: msg.id,
+            );
+          } catch (_) {}
         }
-      } catch (_) {}
+      }
     }
   }
 

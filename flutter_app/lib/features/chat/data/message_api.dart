@@ -60,6 +60,11 @@ class MessageApi {
     await _dio.post('/messages/$messageId/read/');
   }
 
+  /// Mark all messages in a conversation as read for the current user.
+  Future<void> markAllAsRead(String conversationId) async {
+    await _dio.post('/conversations/$conversationId/messages/read-all/');
+  }
+
   /// Upload a file.
   Future<Map<String, dynamic>> uploadFile(String filePath) async {
     final formData = FormData.fromMap({

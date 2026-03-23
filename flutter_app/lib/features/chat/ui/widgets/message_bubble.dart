@@ -44,7 +44,11 @@ class MessageBubble extends StatelessWidget {
 
   Color _senderColor() {
     if (message.sender == null) return WhisperColors.accent;
-    final hash = message.sender!.id.hashCode.abs();
+    final id = message.sender!.id;
+    int hash = 0;
+    for (int i = 0; i < id.length; i++) {
+      hash = (hash * 31 + id.codeUnitAt(i)) & 0x7FFFFFFF;
+    }
     return _senderColors[hash % _senderColors.length];
   }
 
@@ -229,6 +233,8 @@ class MessageBubble extends StatelessWidget {
     switch (message.messageType) {
       case 'image':
         return _buildImageMessage();
+      case 'video':
+        return _buildVideoMessage();
       case 'voice':
         return _buildVoiceMessage();
       case 'file':
@@ -334,6 +340,73 @@ class MessageBubble extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoMessage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (message.fileUrl != null) {
+              launchUrl(Uri.parse(message.fileUrl!),
+                  mode: LaunchMode.externalApplication);
+            }
+          },
+          child: Container(
+            width: 240,
+            height: 180,
+            decoration: BoxDecoration(
+              color: WhisperColors.surfaceSecondary,
+            ),
+            child: Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.play,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (message.fileName != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              WhisperSpacing.sm,
+              WhisperSpacing.xs,
+              WhisperSpacing.sm,
+              0,
+            ),
+            child: Text(
+              message.fileName!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: isSent
+                    ? WhisperColors.bubbleSentText.withOpacity(0.8)
+                    : WhisperColors.textSecondary,
+              ),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            WhisperSpacing.sm,
+            WhisperSpacing.xs,
+            WhisperSpacing.sm,
+            WhisperSpacing.xs,
+          ),
+          child: _buildTimestamp(),
+        ),
+      ],
     );
   }
 
@@ -533,6 +606,8 @@ class MessageBubble extends StatelessWidget {
     switch (type) {
       case 'image':
         return '📷 Photo';
+      case 'video':
+        return '🎬 Video';
       case 'voice':
         return '🎤 Voice message';
       case 'file':
