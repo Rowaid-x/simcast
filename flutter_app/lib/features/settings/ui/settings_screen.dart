@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../config/theme.dart';
 
@@ -21,11 +22,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _sound = true;
   bool _readReceipts = true;
   bool _onlineStatus = true;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -147,7 +157,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingsTile(
             icon: LucideIcons.info,
             title: 'Version',
-            subtitle: '1.0.0',
+            subtitle: _appVersion.isEmpty ? '...' : _appVersion,
           ),
           _SettingsTile(
             icon: LucideIcons.shield,
