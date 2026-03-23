@@ -3,9 +3,21 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
+
+BACKEND_VERSION = '2.1.0'
+
+
+def version_view(request):
+    return JsonResponse({
+        'version': BACKEND_VERSION,
+        'status': 'ok',
+    })
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/version/', version_view, name='api_version'),
     path('api/v1/auth/', include('apps.users.urls_auth')),
     path('api/v1/users/', include('apps.users.urls_users')),
     path('api/v1/conversations/', include('apps.conversations.urls')),

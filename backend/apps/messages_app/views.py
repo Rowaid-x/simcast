@@ -61,7 +61,7 @@ class MessageListCreateView(generics.ListCreateAPIView):
         return Message.objects.filter(
             conversation_id=conversation_id,
             is_deleted=False,
-        ).select_related('sender', 'reply_to', 'reply_to__sender')
+        ).select_related('sender', 'reply_to', 'reply_to__sender').prefetch_related('reactions__user')
 
     def create(self, request, *args, **kwargs):
         conversation_id = self.kwargs['conversation_id']
