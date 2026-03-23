@@ -66,19 +66,23 @@ class _ChatInputBarState extends State<ChatInputBar> {
     _focusNode.requestFocus();
   }
 
-  /// Pick image with requestFullMetadata:false to strip iPhone P3 ICC profile
-  /// (fixes green tint on HEIC photos).
+  /// Pick image and force JPEG output to strip iPhone Display P3 ICC profile
+  /// (fixes green tint on both camera captures and HEIC gallery picks).
   Future<String?> _pickImageFixed(ImageSource source) async {
     final xfile = await _picker.pickImage(
       source: source,
       maxWidth: 1920,
       maxHeight: 1920,
-      imageQuality: 88,
+      imageQuality: 85,
       requestFullMetadata: false,
     );
     if (xfile == null) return null;
+
+    // Always rename to .jpg so the upload endpoint treats it as JPEG.
+    // image_picker with imageQuality < 100 already re-encodes to JPEG on iOS,
+    // but the file extension may still be .heic/.png — rename to be safe.
     final ext = path.extension(xfile.path).toLowerCase();
-    if (ext == '.heic' || ext == '.heif') {
+    if (ext != '.jpg' && ext != '.jpeg') {
       final tmpDir = await getTemporaryDirectory();
       final dest =
           '${tmpDir.path}/${path.basenameWithoutExtension(xfile.path)}.jpg';

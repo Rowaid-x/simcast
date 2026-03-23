@@ -60,6 +60,21 @@ class _VoicePlayerState extends State<VoicePlayer> {
     }
   }
 
+  void _seekToPosition(double dx, BuildContext context) {
+    if (_duration.inMilliseconds <= 0) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    // Account for the play button width (~48px) and padding
+    final barWidth = box.size.width - 48;
+    if (barWidth <= 0) return;
+    final adjustedDx = (dx).clamp(0.0, barWidth);
+    final fraction = adjustedDx / barWidth;
+    final seekPosition = Duration(
+      milliseconds: (fraction * _duration.inMilliseconds).round(),
+    );
+    _player.seek(seekPosition);
+  }
+
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -111,26 +126,30 @@ class _VoicePlayerState extends State<VoicePlayer> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Waveform-style progress bar
-              SizedBox(
-                height: 24,
-                child: Row(
-                  children: List.generate(28, (i) {
-                    final barProgress = i / 28;
-                    final isActive = barProgress <= progress;
-                    // Pseudo-random heights based on index
-                    final heightFactor = 0.3 + (((i * 7 + 3) % 5) / 5) * 0.7;
-                    return Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                        decoration: BoxDecoration(
-                          color: isActive ? accentColor : dimColor,
-                          borderRadius: BorderRadius.circular(1.5),
+              // Waveform-style progress bar with seek
+              GestureDetector(
+                onTapDown: (details) => _seekToPosition(details.localPosition.dx, context),
+                onHorizontalDragUpdate: (details) => _seekToPosition(details.localPosition.dx, context),
+                child: SizedBox(
+                  height: 24,
+                  child: Row(
+                    children: List.generate(28, (i) {
+                      final barProgress = i / 28;
+                      final isActive = barProgress <= progress;
+                      // Pseudo-random heights based on index
+                      final heightFactor = 0.3 + (((i * 7 + 3) % 5) / 5) * 0.7;
+                      return Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                          decoration: BoxDecoration(
+                            color: isActive ? accentColor : dimColor,
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                          height: 24 * heightFactor,
                         ),
-                        height: 24 * heightFactor,
-                      ),
-                    );
-                  }),
+                      );
+                    }),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),

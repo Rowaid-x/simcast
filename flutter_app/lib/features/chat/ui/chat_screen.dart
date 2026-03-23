@@ -26,6 +26,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String? otherUserAvatar;
   final bool isOnline;
   final int? autoDeleteTimer;
+  final int memberCount;
 
   const ChatScreen({
     super.key,
@@ -35,6 +36,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     this.otherUserAvatar,
     this.isOnline = false,
     this.autoDeleteTimer,
+    this.memberCount = 0,
   });
 
   @override
@@ -421,7 +423,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Text(
                   widget.conversationType == 'direct'
                       ? (widget.isOnline ? 'online' : 'offline')
-                      : 'group',
+                      : widget.memberCount > 0
+                          ? '${widget.memberCount} members'
+                          : 'group',
                   style: WhisperTypography.caption.copyWith(
                     color: widget.isOnline && widget.conversationType == 'direct'
                         ? WhisperColors.success
@@ -526,16 +530,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         return Column(
           children: [
             if (dateSeparator != null) dateSeparator,
-            MessageBubble(
-              message: message,
+            _SwipeToReply(
+              onReply: () => setState(() => _replyToId = message.id),
               isSent: isSent,
-              showSenderName: widget.conversationType == 'group',
-              onLongPress: () => _showMessageOptions(message, isSent),
-              onRetry: message.isFailed
-                  ? () => ref
-                      .read(chatProvider(widget.conversationId).notifier)
-                      .retryMessage(message.id)
-                  : null,
+              child: MessageBubble(
+                message: message,
+                isSent: isSent,
+                showSenderName: widget.conversationType == 'group',
+                onLongPress: () => _showMessageOptions(message, isSent),
+                onRetry: message.isFailed
+                    ? () => ref
+                        .read(chatProvider(widget.conversationId).notifier)
+                        .retryMessage(message.id)
+                    : null,
+              ),
             ),
           ],
         );
@@ -799,6 +807,112 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ElevatedButton(
             onPressed: () => ref.invalidate(chatProvider(widget.conversationId)),
             child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Swipe-to-reply gesture wrapper for message bubbles.
+/// Swipe right on received messages, left on sent messages to trigger reply.
+class _SwipeToReply extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onReply;
+  final bool isSent;
+
+  const _SwipeToReply({
+    required this.child,
+    required this.onReply,
+    required this.isSent,
+  });
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _dragOffset = 0;
+  static const _threshold = 60.0;
+  bool _triggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      if (widget.isSent) {
+        // Sent messages: swipe left (negative)
+        _dragOffset = (_dragOffset + details.delta.dx).clamp(-_threshold * 1.5, 0);
+      } else {
+        // Received messages: swipe right (positive)
+        _dragOffset = (_dragOffset + details.delta.dx).clamp(0, _threshold * 1.5);
+      }
+    });
+    if (_dragOffset.abs() >= _threshold && !_triggered) {
+      _triggered = true;
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (_triggered) {
+      widget.onReply();
+    }
+    _triggered = false;
+    setState(() => _dragOffset = 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final replyIconOpacity = (_dragOffset.abs() / _threshold).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: Stack(
+        alignment: widget.isSent ? Alignment.centerRight : Alignment.centerLeft,
+        children: [
+          // Reply icon that appears behind the bubble
+          if (_dragOffset.abs() > 10)
+            Positioned(
+              left: widget.isSent ? null : 8,
+              right: widget.isSent ? 8 : null,
+              child: Opacity(
+                opacity: replyIconOpacity,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: WhisperColors.accent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    LucideIcons.reply,
+                    size: 16,
+                    color: WhisperColors.accent,
+                  ),
+                ),
+              ),
+            ),
+          // The message bubble, offset by drag
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: widget.child,
           ),
         ],
       ),

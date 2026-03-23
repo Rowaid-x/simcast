@@ -531,9 +531,32 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildTimestamp() {
+    final countdown = DateFormatter.expiryCountdown(message.expiresAt);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Auto-delete countdown (when < 1 hour remaining)
+        if (countdown != null) ...[
+          Icon(
+            LucideIcons.timer,
+            size: 11,
+            color: isSent
+                ? WhisperColors.bubbleSentText.withOpacity(0.7)
+                : WhisperColors.warning,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            countdown,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSent
+                  ? WhisperColors.bubbleSentText.withOpacity(0.7)
+                  : WhisperColors.warning,
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
         Text(
           DateFormatter.messageTime(message.createdAt),
           style: TextStyle(

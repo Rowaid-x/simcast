@@ -78,6 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               otherUserAvatar: extra?['avatar'],
               isOnline: extra?['isOnline'] ?? false,
               autoDeleteTimer: extra?['autoDeleteTimer'],
+              memberCount: extra?['memberCount'] ?? 0,
             ),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);

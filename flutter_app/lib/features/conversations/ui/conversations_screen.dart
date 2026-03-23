@@ -254,6 +254,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
                                 'isOnline': conversation.isOtherUserOnline,
                                 'autoDeleteTimer':
                                     conversation.autoDeleteTimer,
+                                'memberCount': conversation.memberCount,
                               },
                             );
                           },
