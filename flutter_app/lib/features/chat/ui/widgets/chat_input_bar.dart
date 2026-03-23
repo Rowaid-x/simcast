@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:path/path.dart' as path;
@@ -66,30 +67,32 @@ class _ChatInputBarState extends State<ChatInputBar> {
     _focusNode.requestFocus();
   }
 
-  /// Pick image and force JPEG output to strip iPhone Display P3 ICC profile
-  /// (fixes green tint on both camera captures and HEIC gallery picks).
+  /// Pick image and re-encode as JPEG to fix iOS green tint.
+  ///
+  /// The green tint happens because iOS camera outputs BGRA / Display P3 color
+  /// space. image_picker's built-in re-encode doesn't always strip the P3 ICC
+  /// profile. Decoding with the `image` package and re-encoding as JPEG forces
+  /// correct sRGB channel order, eliminating the tint.
   Future<String?> _pickImageFixed(ImageSource source) async {
     final xfile = await _picker.pickImage(
       source: source,
       maxWidth: 1920,
       maxHeight: 1920,
-      imageQuality: 85,
       requestFullMetadata: false,
     );
     if (xfile == null) return null;
 
-    // Always rename to .jpg so the upload endpoint treats it as JPEG.
-    // image_picker with imageQuality < 100 already re-encodes to JPEG on iOS,
-    // but the file extension may still be .heic/.png — rename to be safe.
-    final ext = path.extension(xfile.path).toLowerCase();
-    if (ext != '.jpg' && ext != '.jpeg') {
-      final tmpDir = await getTemporaryDirectory();
-      final dest =
-          '${tmpDir.path}/${path.basenameWithoutExtension(xfile.path)}.jpg';
-      await File(xfile.path).copy(dest);
-      return dest;
-    }
-    return xfile.path;
+    // Decode → re-encode as JPEG to force sRGB and fix BGRA channel swap
+    final bytes = await File(xfile.path).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return xfile.path;
+
+    final jpegBytes = img.encodeJpg(decoded, quality: 85);
+    final tmpDir = await getTemporaryDirectory();
+    final dest =
+        '${tmpDir.path}/${path.basenameWithoutExtension(xfile.path)}_fixed.jpg';
+    await File(dest).writeAsBytes(jpegBytes);
+    return dest;
   }
 
   void _showAttachmentSheet() {

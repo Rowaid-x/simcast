@@ -33,6 +33,7 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
+  image: ^4.3.0
   file_picker: ^8.0.7
   record: ^5.1.2
   audioplayers: ^6.0.0
@@ -65,6 +66,13 @@ dev_dependencies:
   json_serializable: ^6.8.0
   freezed: ^2.5.7
   riverpod_generator: ^2.4.3
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
