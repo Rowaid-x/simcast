@@ -76,6 +76,11 @@ class MessageRepository {
         .toList();
   }
 
+  /// Toggle a reaction on a message.
+  Future<void> toggleReaction(String messageId, String emoji) async {
+    await _api.toggleReaction(messageId, emoji);
+  }
+
   /// Upload a file and return metadata.
   Future<FileUploadResult> uploadFile(String filePath) async {
     final data = await _api.uploadFile(filePath);

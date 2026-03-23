@@ -1,6 +1,30 @@
 import 'package:equatable/equatable.dart';
 import 'user.dart';
 
+/// A single emoji reaction on a message.
+class MessageReaction extends Equatable {
+  final String emoji;
+  final String userId;
+  final String userDisplayName;
+
+  const MessageReaction({
+    required this.emoji,
+    required this.userId,
+    required this.userDisplayName,
+  });
+
+  factory MessageReaction.fromJson(Map<String, dynamic> json) {
+    return MessageReaction(
+      emoji: json['emoji'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      userDisplayName: json['user_display_name'] as String? ?? 'Unknown',
+    );
+  }
+
+  @override
+  List<Object?> get props => [emoji, userId];
+}
+
 /// Chat message model with support for text, image, voice, and file types.
 class Message extends Equatable {
   final String id;
@@ -18,6 +42,7 @@ class Message extends Equatable {
   final bool isDeleted;
   final bool isRead;
   final bool isFailed;
+  final List<MessageReaction> reactions;
   final DateTime createdAt;
 
   const Message({
@@ -36,11 +61,21 @@ class Message extends Equatable {
     this.isDeleted = false,
     this.isRead = false,
     this.isFailed = false,
+    this.reactions = const [],
     required this.createdAt,
   });
 
   /// Whether this message was sent by the given user ID.
   bool isSentBy(String userId) => sender?.id == userId;
+
+  /// Group reactions by emoji for display.
+  Map<String, List<MessageReaction>> get groupedReactions {
+    final map = <String, List<MessageReaction>>{};
+    for (final r in reactions) {
+      map.putIfAbsent(r.emoji, () => []).add(r);
+    }
+    return map;
+  }
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
@@ -62,12 +97,16 @@ class Message extends Equatable {
           : null,
       isDeleted: json['is_deleted'] ?? false,
       isRead: json['is_read'] ?? false,
+      reactions: (json['reactions'] as List?)
+              ?.map((r) => MessageReaction.fromJson(r as Map<String, dynamic>))
+              .toList() ??
+          const [],
       createdAt: DateTime.parse(
           json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 
-  Message copyWith({bool? isRead, bool? isFailed}) {
+  Message copyWith({bool? isRead, bool? isFailed, List<MessageReaction>? reactions}) {
     return Message(
       id: id,
       conversationId: conversationId,
@@ -84,12 +123,13 @@ class Message extends Equatable {
       isDeleted: isDeleted,
       isRead: isRead ?? this.isRead,
       isFailed: isFailed ?? this.isFailed,
+      reactions: reactions ?? this.reactions,
       createdAt: createdAt,
     );
   }
 
   @override
-  List<Object?> get props => [id, conversationId, content, isDeleted, isRead];
+  List<Object?> get props => [id, conversationId, content, isDeleted, isRead, reactions];
 }
 
 /// Preview of a replied-to message.

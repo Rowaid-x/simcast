@@ -538,7 +538,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 message: message,
                 isSent: isSent,
                 showSenderName: widget.conversationType == 'group',
+                currentUserId: _currentUserId,
                 onLongPress: () => _showMessageOptions(message, isSent),
+                onReact: (emoji) => ref
+                    .read(chatProvider(widget.conversationId).notifier)
+                    .toggleReaction(message.id, emoji),
                 onRetry: message.isFailed
                     ? () => ref
                         .read(chatProvider(widget.conversationId).notifier)
@@ -580,6 +584,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  static const _quickEmojis = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
+
   void _showMessageOptions(message, bool isSent) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
@@ -590,7 +596,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           top: Radius.circular(WhisperRadius.xl),
         ),
       ),
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -603,7 +609,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: WhisperSpacing.lg),
+            const SizedBox(height: WhisperSpacing.md),
+            // Quick reaction emoji row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: WhisperSpacing.xl),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: _quickEmojis.map((emoji) {
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      HapticFeedback.lightImpact();
+                      ref
+                          .read(chatProvider(widget.conversationId).notifier)
+                          .toggleReaction(message.id, emoji);
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: WhisperColors.surfaceSecondary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(emoji, style: const TextStyle(fontSize: 22)),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: WhisperSpacing.md),
+            const Divider(color: WhisperColors.divider, height: 1),
+            const SizedBox(height: WhisperSpacing.xs),
             ListTile(
               leading: const Icon(LucideIcons.reply,
                   color: WhisperColors.textSecondary, size: 20),

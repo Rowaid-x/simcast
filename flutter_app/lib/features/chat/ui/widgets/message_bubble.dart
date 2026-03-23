@@ -16,18 +16,22 @@ class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isSent;
   final bool showSenderName;
+  final String? currentUserId;
   final VoidCallback? onLongPress;
   final VoidCallback? onReply;
   final VoidCallback? onRetry;
+  final Function(String emoji)? onReact;
 
   const MessageBubble({
     super.key,
     required this.message,
     required this.isSent,
     this.showSenderName = false,
+    this.currentUserId,
     this.onLongPress,
     this.onReply,
     this.onRetry,
+    this.onReact,
   });
 
   // Consistent color for each sender based on their user ID
@@ -156,6 +160,8 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
                     ),
+                    // Reaction chips
+                    if (message.reactions.isNotEmpty) _buildReactionChips(),
                   ],
                 ),
               ),
@@ -579,6 +585,51 @@ class MessageBubble extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildReactionChips() {
+    final grouped = message.groupedReactions;
+    final myId = currentUserId;
+    return Transform.translate(
+      offset: const Offset(0, -4),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 2,
+        children: grouped.entries.map((entry) {
+          final isMine = myId != null && entry.value.any((r) => r.userId == myId);
+          return GestureDetector(
+            onTap: () => onReact?.call(entry.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: WhisperColors.surfaceSecondary,
+                borderRadius: BorderRadius.circular(WhisperRadius.full),
+                border: isMine
+                    ? Border.all(color: WhisperColors.accent.withOpacity(0.6), width: 1.5)
+                    : null,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(entry.key, style: const TextStyle(fontSize: 14)),
+                  if (entry.value.length > 1) ...[
+                    const SizedBox(width: 2),
+                    Text(
+                      '${entry.value.length}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isMine ? WhisperColors.accent : WhisperColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 

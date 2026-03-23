@@ -338,6 +338,40 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return null;
   }
 
+  /// Toggle a reaction on a message (optimistic + REST).
+  Future<void> toggleReaction(String messageId, String emoji) async {
+    final userId = await SecureStorage.getUserId();
+    if (userId == null) return;
+
+    // Optimistic update
+    final updated = state.messages.map((m) {
+      if (m.id != messageId) return m;
+      final existing = m.reactions.where((r) => r.userId == userId).firstOrNull;
+      List<MessageReaction> newReactions;
+      if (existing != null && existing.emoji == emoji) {
+        // Toggle off
+        newReactions = m.reactions.where((r) => r.userId != userId).toList();
+      } else {
+        // Add or change
+        newReactions = [
+          ...m.reactions.where((r) => r.userId != userId),
+          MessageReaction(emoji: emoji, userId: userId, userDisplayName: 'You'),
+        ];
+      }
+      return m.copyWith(reactions: newReactions);
+    }).toList();
+    state = state.copyWith(messages: updated);
+
+    // REST call
+    try {
+      final repo = _ref.read(messageRepositoryProvider);
+      await repo.toggleReaction(messageId, emoji);
+    } catch (_) {
+      // Revert on failure — reload messages
+      await refresh();
+    }
+  }
+
   /// Delete a message.
   Future<void> deleteMessage(String messageId) async {
     try {
@@ -376,6 +410,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
           break;
         case 'chat.deleted':
           _handleDeletion(message);
+          break;
+        case 'chat.reaction':
+          _handleReaction(message);
           break;
         case 'chat.timer_update':
           _handleTimerUpdate(message);
@@ -502,6 +539,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
       timerUpdated: true,
       clearTimer: newTimer == null,
     );
+  }
+
+  void _handleReaction(Map<String, dynamic> data) {
+    final convId = data['conversation_id'] as String?;
+    if (convId != conversationId) return;
+
+    final messageId = data['message_id'] as String?;
+    final userId = data['user_id'] as String?;
+    final displayName = data['user_display_name'] as String? ?? '';
+    final emoji = data['emoji'] as String? ?? '';
+    final action = data['action'] as String?;
+    if (messageId == null || userId == null) return;
+
+    final updated = state.messages.map((m) {
+      if (m.id != messageId) return m;
+      List<MessageReaction> newReactions;
+      if (action == 'removed') {
+        newReactions = m.reactions.where((r) => r.userId != userId).toList();
+      } else {
+        // added or changed — replace any existing reaction from this user
+        newReactions = [
+          ...m.reactions.where((r) => r.userId != userId),
+          MessageReaction(emoji: emoji, userId: userId, userDisplayName: displayName),
+        ];
+      }
+      return m.copyWith(reactions: newReactions);
+    }).toList();
+    state = state.copyWith(messages: updated);
   }
 
   void _handleDeletion(Map<String, dynamic> data) {

@@ -71,6 +71,14 @@ class MessageApi {
     return response.data as List<dynamic>;
   }
 
+  /// Toggle a reaction on a message.
+  Future<Response> toggleReaction(String messageId, String emoji) async {
+    return await _dio.post(
+      '/messages/$messageId/reactions/',
+      data: {'emoji': emoji},
+    );
+  }
+
   /// Upload a file.
   Future<Map<String, dynamic>> uploadFile(String filePath) async {
     final formData = FormData.fromMap({
