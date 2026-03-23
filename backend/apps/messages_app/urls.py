@@ -10,6 +10,7 @@ urlpatterns = [
     ),
     path('messages/<uuid:pk>/', views.MessageDeleteView.as_view(), name='message_delete'),
     path('messages/<uuid:pk>/read/', views.MessageReadView.as_view(), name='message_read'),
+    path('messages/<uuid:pk>/read-by/', views.MessageReadByView.as_view(), name='message_read_by'),
     path(
         'conversations/<uuid:conversation_id>/messages/read-all/',
         views.ConversationMarkAllReadView.as_view(),

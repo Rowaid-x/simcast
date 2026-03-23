@@ -140,6 +140,40 @@ class MessageReadView(APIView):
         return Response({'message': 'Marked as read.'})
 
 
+class MessageReadByView(APIView):
+    """Get the list of users who have read a specific message."""
+
+    def get(self, request, pk):
+        try:
+            message = Message.objects.get(pk=pk)
+        except Message.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # Verify the requesting user is a member of the conversation
+        if not ConversationMember.objects.filter(
+            conversation=message.conversation, user=request.user
+        ).exists():
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        receipts = MessageReadReceipt.objects.filter(
+            message=message,
+        ).select_related('user').order_by('read_at')
+
+        data = [
+            {
+                'user': {
+                    'id': str(receipt.user.id),
+                    'display_name': receipt.user.display_name,
+                    'avatar_url': receipt.user.avatar_url,
+                },
+                'read_at': receipt.read_at.isoformat(),
+            }
+            for receipt in receipts
+        ]
+
+        return Response(data)
+
+
 class ConversationMarkAllReadView(APIView):
     """Mark all messages in a conversation as read for the requesting user."""
 
