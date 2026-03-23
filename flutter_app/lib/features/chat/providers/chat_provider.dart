@@ -343,6 +343,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final userId = await SecureStorage.getUserId();
     if (userId == null) return;
 
+    // Save old reactions for potential revert
+    final oldMessages = List<Message>.from(state.messages);
+
     // Optimistic update
     final updated = state.messages.map((m) {
       if (m.id != messageId) return m;
@@ -367,8 +370,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final repo = _ref.read(messageRepositoryProvider);
       await repo.toggleReaction(messageId, emoji);
     } catch (_) {
-      // Revert on failure — reload messages
-      await refresh();
+      // Revert optimistic update on failure
+      if (mounted) state = state.copyWith(messages: oldMessages);
     }
   }
 

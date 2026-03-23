@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../config/constants.dart';
 import '../../../config/theme.dart';
 
 /// App settings screen with notification and privacy options.
@@ -23,18 +25,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _readReceipts = true;
   bool _onlineStatus = true;
   String _appVersion = '';
+  String _backendVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _loadVersion();
+    _loadBackendVersion();
   }
 
   Future<void> _loadVersion() async {
     final info = await PackageInfo.fromPlatform();
     if (mounted) {
       setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+    }
+  }
+
+  Future<void> _loadBackendVersion() async {
+    try {
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 5),
+      ));
+      final response = await dio.get('/version/');
+      if (mounted && response.data is Map) {
+        setState(() => _backendVersion = response.data['version'] ?? '?');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _backendVersion = 'unreachable');
     }
   }
 
@@ -156,8 +176,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SectionHeader(title: 'About'),
           _SettingsTile(
             icon: LucideIcons.info,
-            title: 'Version',
+            title: 'App Version',
             subtitle: _appVersion.isEmpty ? '...' : _appVersion,
+          ),
+          _SettingsTile(
+            icon: LucideIcons.server,
+            title: 'Backend Version',
+            subtitle: _backendVersion.isEmpty ? '...' : _backendVersion,
           ),
           _SettingsTile(
             icon: LucideIcons.shield,
