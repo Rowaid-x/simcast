@@ -196,6 +196,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             'message_ids': event['message_ids'],
         })
 
+    async def chat_reaction(self, event):
+        """Send reaction update to the client."""
+        await self.send_json({
+            'type': 'chat.reaction',
+            'conversation_id': event['conversation_id'],
+            'message_id': event['message_id'],
+            'user_id': event['user_id'],
+            'user_display_name': event['user_display_name'],
+            'emoji': event['emoji'],
+            'action': event['action'],
+        })
+
     async def chat_timer_update(self, event):
         """Send timer update to the client."""
         await self.send_json({

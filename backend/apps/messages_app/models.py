@@ -100,3 +100,29 @@ class MessageReadReceipt(models.Model):
 
     def __str__(self):
         return f"{self.user} read {self.message_id}"
+
+
+class MessageReaction(models.Model):
+    """Tracks emoji reactions on messages. One reaction per user per message."""
+    ALLOWED_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🙏', '🔥', '👎', '🎉', '😡']
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name='reactions',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='message_reactions',
+    )
+    emoji = models.CharField(max_length=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'message_reactions'
+        unique_together = ['message', 'user']
+
+    def __str__(self):
+        return f"{self.user} reacted {self.emoji} on {self.message_id}"

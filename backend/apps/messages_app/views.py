@@ -13,7 +13,10 @@ from rest_framework.views import APIView
 from apps.conversations.models import Conversation, ConversationMember
 from core.pagination import MessageCursorPagination
 from core.throttles import MessageRateThrottle, UploadRateThrottle
-from .models import Message, MessageReadReceipt
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from .models import Message, MessageReadReceipt, MessageReaction
 from .serializers import MessageListSerializer, CreateMessageSerializer
 
 
@@ -206,6 +209,62 @@ class ConversationMarkAllReadView(APIView):
         MessageReadReceipt.objects.bulk_create(receipts, ignore_conflicts=True)
 
         return Response({'marked': len(receipts)})
+
+
+class MessageReactionView(APIView):
+    """Toggle an emoji reaction on a message."""
+
+    def post(self, request, pk):
+        """Add/change/remove a reaction. Same emoji = toggle off."""
+        emoji = request.data.get('emoji', '').strip()
+        if not emoji or emoji not in MessageReaction.ALLOWED_EMOJIS:
+            return Response(
+                {'error': {'code': 'bad_request', 'message': f'Invalid emoji. Allowed: {MessageReaction.ALLOWED_EMOJIS}'}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            message = Message.objects.select_related('conversation').get(pk=pk)
+        except Message.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if not ConversationMember.objects.filter(
+            conversation=message.conversation, user=request.user
+        ).exists():
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        existing = MessageReaction.objects.filter(message=message, user=request.user).first()
+
+        if existing and existing.emoji == emoji:
+            # Toggle off — same emoji removes the reaction
+            existing.delete()
+            action = 'removed'
+        elif existing:
+            # Change emoji
+            existing.emoji = emoji
+            existing.save(update_fields=['emoji'])
+            action = 'changed'
+        else:
+            # New reaction
+            MessageReaction.objects.create(message=message, user=request.user, emoji=emoji)
+            action = 'added'
+
+        # Broadcast via WebSocket
+        channel_layer = get_channel_layer()
+        group_name = f"conversation_{message.conversation_id}"
+        async_to_sync(channel_layer.group_send)(group_name, {
+            'type': 'chat_reaction',
+            'conversation_id': str(message.conversation_id),
+            'message_id': str(message.id),
+            'user_id': str(request.user.id),
+            'user_display_name': request.user.display_name,
+            'emoji': emoji,
+            'action': action,
+        })
+
+        if action == 'removed':
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'action': action, 'emoji': emoji}, status=status.HTTP_200_OK)
 
 
 class FileUploadView(APIView):

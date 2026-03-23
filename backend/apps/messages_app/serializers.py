@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from apps.users.serializers import UserSearchSerializer
 from core.encryption import decrypt_message, encrypt_message
-from .models import Message, MessageReadReceipt
+from .models import Message, MessageReadReceipt, MessageReaction
 
 
 class MessageListSerializer(serializers.ModelSerializer):
@@ -18,6 +18,7 @@ class MessageListSerializer(serializers.ModelSerializer):
     sender = UserSearchSerializer(read_only=True)
     is_read = serializers.SerializerMethodField()
     reply_to_preview = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -25,7 +26,7 @@ class MessageListSerializer(serializers.ModelSerializer):
             'id', 'conversation_id', 'sender', 'content', 'message_type',
             'file_url', 'file_name', 'file_size', 'file_mime_type',
             'reply_to', 'reply_to_preview', 'expires_at', 'is_deleted',
-            'is_read', 'created_at',
+            'is_read', 'reactions', 'created_at',
         ]
         read_only_fields = fields
 
@@ -66,6 +67,17 @@ class MessageListSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_reactions(self, obj):
+        """Return flat list of reactions with user info."""
+        return [
+            {
+                'emoji': r.emoji,
+                'user_id': str(r.user_id),
+                'user_display_name': r.user.display_name if r.user else 'Unknown',
+            }
+            for r in obj.reactions.select_related('user').all()
+        ]
+
 
 class CreateMessageSerializer(serializers.Serializer):
     """
@@ -75,7 +87,7 @@ class CreateMessageSerializer(serializers.Serializer):
     """
     content = serializers.CharField(max_length=5000)
     message_type = serializers.ChoiceField(
-        choices=['text', 'image', 'voice', 'file'],
+        choices=['text', 'image', 'voice', 'video', 'file'],
         default='text',
     )
     reply_to = serializers.UUIDField(required=False, allow_null=True)
