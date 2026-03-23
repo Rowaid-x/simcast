@@ -140,6 +140,40 @@ class MessageReadView(APIView):
         return Response({'message': 'Marked as read.'})
 
 
+class ConversationMarkAllReadView(APIView):
+    """Mark all messages in a conversation as read for the requesting user."""
+
+    def post(self, request, conversation_id):
+        # Verify membership
+        if not ConversationMember.objects.filter(
+            conversation_id=conversation_id, user=request.user
+        ).exists():
+            return Response(
+                {'error': {'code': 'forbidden', 'message': 'You are not a member of this conversation.'}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Find all unread messages not sent by the user
+        unread_messages = Message.objects.filter(
+            conversation_id=conversation_id,
+            is_deleted=False,
+        ).exclude(
+            sender=request.user,
+        ).exclude(
+            read_receipts__user=request.user,
+        )
+
+        # Bulk create read receipts
+        now = timezone.now()
+        receipts = [
+            MessageReadReceipt(message=msg, user=request.user, read_at=now)
+            for msg in unread_messages
+        ]
+        MessageReadReceipt.objects.bulk_create(receipts, ignore_conflicts=True)
+
+        return Response({'marked': len(receipts)})
+
+
 class FileUploadView(APIView):
     """
     Upload a file with MIME type validation and size limits.

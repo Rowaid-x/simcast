@@ -10,5 +10,10 @@ urlpatterns = [
     ),
     path('messages/<uuid:pk>/', views.MessageDeleteView.as_view(), name='message_delete'),
     path('messages/<uuid:pk>/read/', views.MessageReadView.as_view(), name='message_read'),
+    path(
+        'conversations/<uuid:conversation_id>/messages/read-all/',
+        views.ConversationMarkAllReadView.as_view(),
+        name='conversation_mark_all_read',
+    ),
     path('upload/', views.FileUploadView.as_view(), name='file_upload'),
 ]
